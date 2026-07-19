@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from services.auth_service import AuthService
+from services.user_service import UserService
 from schemas.auth import UserMeResponse
+from schemas.user import UserProfileUpdate, UserProfileResponse
 
 router = APIRouter()
 security = HTTPBearer()
@@ -36,3 +38,35 @@ def get_dashboard_info(current_user=Depends(get_current_user)):
             "avatar": current_user.user_metadata.get("avatar_url") if current_user.user_metadata else None,
         }
     )
+
+@router.get("/users/profile", response_model=UserProfileResponse, summary="Obtener el perfil del usuario")
+def get_user_profile(current_user=Depends(get_current_user)):
+    """
+    Retorna el perfil del usuario en la base de datos relacional de Supabase.
+    """
+    profile = UserService.get_profile(current_user.id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil de usuario no encontrado en la base de datos."
+        )
+    return profile
+
+@router.post("/users/profile", response_model=UserProfileResponse, summary="Crear o actualizar el perfil del usuario")
+def upsert_user_profile(profile_data: UserProfileUpdate, current_user=Depends(get_current_user)):
+    """
+    Crea o actualiza los datos del perfil del usuario (onboarding y configuraciones del perfil).
+    """
+    default_name = current_user.user_metadata.get("full_name") if current_user.user_metadata else None
+    profile = UserService.upsert_profile(
+        user_id=current_user.id,
+        email=current_user.email,
+        default_name=default_name,
+        profile_data=profile_data
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo crear o actualizar el perfil del usuario."
+        )
+    return profile
