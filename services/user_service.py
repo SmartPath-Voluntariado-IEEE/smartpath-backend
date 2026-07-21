@@ -1,11 +1,12 @@
-from database.database import supabase_client
+from typing import Optional
+from database.database import get_db_client
 from schemas.user import UserProfileUpdate
 
 class UserService:
     @staticmethod
-    def get_user_skills(user_id: str):
-        # Consulta para traer el nivel y el slug de la skill asociada
-        response = supabase_client.table("user_skills").select("level, skills(slug)").eq("user_id", user_id).execute()
+    def get_user_skills(user_id: str, token: Optional[str] = None):
+        client = get_db_client(token)
+        response = client.table("user_skills").select("level, skills(slug)").eq("user_id", user_id).execute()
         skills = []
         if response.data:
             for item in response.data:
@@ -18,26 +19,23 @@ class UserService:
         return skills
 
     @staticmethod
-    def save_user_skills(user_id: str, skills_list):
+    def save_user_skills(user_id: str, skills_list, token: Optional[str] = None):
         if skills_list is None:
             return
             
-        # 1. Borrar todas las skills existentes del usuario para evitar duplicados
-        supabase_client.table("user_skills").delete().eq("user_id", user_id).execute()
+        client = get_db_client(token)
+        client.table("user_skills").delete().eq("user_id", user_id).execute()
         
         if not skills_list:
             return
             
-        # 2. Obtener un mapeo de skill_slug -> skill_id
-        skills_resp = supabase_client.table("skills").select("id, slug").execute()
+        skills_resp = client.table("skills").select("id, slug").execute()
         slug_to_id = {}
         if skills_resp.data:
             slug_to_id = {item["slug"]: item["id"] for item in skills_resp.data}
             
-        # 3. Preparar e insertar las nuevas relaciones
         insert_data = []
         for sk in skills_list:
-            # En caso de que venga como diccionario u objeto Pydantic
             slug = sk.skill_slug if hasattr(sk, "skill_slug") else sk.get("skill_slug")
             level = sk.level if hasattr(sk, "level") else sk.get("level", 1)
             
@@ -50,47 +48,56 @@ class UserService:
                 })
         
         if insert_data:
-            supabase_client.table("user_skills").insert(insert_data).execute()
+            client.table("user_skills").insert(insert_data).execute()
 
     @staticmethod
-    def get_profile(user_id: str):
-        response = supabase_client.table("users").select("*").eq("id", user_id).execute()
+    def get_profile(user_id: str, token: Optional[str] = None):
+        client = get_db_client(token)
+        response = client.table("users").select("*").eq("id", user_id).execute()
         if response.data:
             profile = response.data[0]
-            profile["skills"] = UserService.get_user_skills(user_id)
+            profile["skills"] = UserService.get_user_skills(user_id, token=token)
             return profile
         return None
 
     @staticmethod
-    def upsert_profile(user_id: str, email: str, default_name: str, profile_data: UserProfileUpdate):
-        # Preparar los datos básicos
-        data = {
-            "id": user_id,
-            "email": email
-        }
-        
-        # Filtrar campos no nulos del perfil
-        update_dict = profile_data.model_dump(exclude_none=True)
-        
-        # Quitar la lista de skills ya que pertenece a otra tabla
-        skills_list = update_dict.pop("skills", None)
-        
-        data.update(update_dict)
-        
-        # Si 'full_name' no está presente y el usuario no existe en la BD, asignamos el nombre por defecto
-        if "full_name" not in data or not data["full_name"]:
-            existing = UserService.get_profile(user_id)
-            if not existing:
-                data["full_name"] = default_name or "Usuario de SmartPath"
-        
-        # Upsert en la tabla 'users'
-        response = supabase_client.table("users").upsert(data).execute()
-        if response.data:
-            # Si se proporcionó la lista de skills, guardarla
-            if skills_list is not None:
-                UserService.save_user_skills(user_id, skills_list)
-                
-            profile = response.data[0]
-            profile["skills"] = UserService.get_user_skills(user_id)
-            return profile
-        return None
+    def upsert_profile(user_id: str, email: str, default_name: str, profile_data: UserProfileUpdate, token: Optional[str] = None):
+        try:
+            client = get_db_client(token)
+            data = {
+                "id": user_id,
+                "email": email
+            }
+            
+            update_dict = profile_data.model_dump(exclude_none=True)
+            skills_list = update_dict.pop("skills", None)
+            data.update(update_dict)
+            
+            if not data.get("full_name"):
+                data["full_name"] = default_name or (email.split("@")[0] if email else "Usuario de SmartPath")
+            
+            if data.get("professional_goal"):
+                data["professional_goal"] = str(data["professional_goal"])[:100]
+            if data.get("full_name"):
+                data["full_name"] = str(data["full_name"])[:150]
+            if data.get("career"):
+                data["career"] = str(data["career"])[:120]
+            if data.get("university"):
+                data["university"] = str(data["university"])[:150]
+            if data.get("experience_level"):
+                data["experience_level"] = str(data["experience_level"])[:50]
+            if data.get("english_level"):
+                data["english_level"] = str(data["english_level"])[:30]
+
+            response = client.table("users").upsert(data).execute()
+            if response.data:
+                if skills_list is not None:
+                    UserService.save_user_skills(user_id, skills_list, token=token)
+                    
+                profile = response.data[0]
+                profile["skills"] = UserService.get_user_skills(user_id, token=token)
+                return profile
+            return None
+        except Exception as e:
+            print(f"Error crítico en UserService.upsert_profile: {e}")
+            raise e

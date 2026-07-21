@@ -23,6 +23,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user = AuthService.get_user_by_token(token)
         return user
     except Exception as e:
+        print(f"❌ [AUTH REJECTED 401]: Token de usuario no válido o expirado: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Sesión inválida o expirada en el backend: {str(e)}",
@@ -47,8 +48,11 @@ def get_dashboard_info(current_user=Depends(get_current_user)):
     )
 
 @router.get("/users/profile", response_model=UserProfileResponse, summary="Obtener el perfil del usuario")
-def get_user_profile(current_user=Depends(get_current_user)):
-    profile = UserService.get_profile(current_user.id)
+def get_user_profile(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user)
+):
+    profile = UserService.get_profile(current_user.id, token=credentials.credentials)
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -57,13 +61,18 @@ def get_user_profile(current_user=Depends(get_current_user)):
     return profile
 
 @router.post("/users/profile", response_model=UserProfileResponse, summary="Crear o actualizar el perfil del usuario")
-def upsert_user_profile(profile_data: UserProfileUpdate, current_user=Depends(get_current_user)):
+def upsert_user_profile(
+    profile_data: UserProfileUpdate,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user)
+):
     default_name = current_user.user_metadata.get("full_name") if current_user.user_metadata else None
     profile = UserService.upsert_profile(
         user_id=current_user.id,
         email=current_user.email,
         default_name=default_name,
-        profile_data=profile_data
+        profile_data=profile_data,
+        token=credentials.credentials
     )
     if not profile:
         raise HTTPException(
@@ -97,28 +106,30 @@ def get_catalog_roles():
 # ============================================
 
 @router.get("/users/gap-analysis", response_model=GapAnalysisResponse, summary="Analizar brecha de habilidades del usuario")
-def get_user_gap_analysis(current_user=Depends(get_current_user)):
-    profile = UserService.get_profile(current_user.id)
+def get_user_gap_analysis(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user)
+):
+    profile = UserService.get_profile(current_user.id, token=credentials.credentials)
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Perfil de usuario no configurado."
-        )
+        profile = {
+            "target_role_id": "fullstack",
+            "skills": []
+        }
         
-    target_role_id = profile.get("target_role_id")
-    if not target_role_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El perfil del usuario no tiene un rol objetivo (target_role_id) configurado."
-        )
+    target_role_id = profile.get("target_role_id") or "fullstack"
         
     roles = CatalogService.get_all_role_targets()
     target_role = next((r for r in roles if r["id"] == target_role_id), None)
+    if not target_role and roles:
+        target_role = roles[0]
+        
     if not target_role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Rol objetivo no encontrado en el catálogo."
-        )
+        target_role = {
+            "id": target_role_id,
+            "label": "Full Stack Developer",
+            "core_skill_slugs": ["typescript", "react", "nodejs", "postgres", "git", "rest", "docker"]
+        }
         
     jobs = CatalogService.get_all_jobs()
     skills_catalog = CatalogService.get_all_skills()
@@ -130,9 +141,12 @@ def get_user_gap_analysis(current_user=Depends(get_current_user)):
     return analysis
 
 @router.get("/users/roadmap", response_model=List[RoadmapLevel], summary="Generar roadmap personalizado para el usuario")
-def get_user_roadmap(current_user=Depends(get_current_user)):
+def get_user_roadmap(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user)
+):
     # Reutiliza el gap analysis para generar el roadmap
-    gap = get_user_gap_analysis(current_user)
+    gap = get_user_gap_analysis(credentials, current_user)
     # Convertimos de modelo de respuesta a dict básico si es necesario,
     # pero como es pydantic podemos pasarlo directo o usar dict
     gap_dict = gap if isinstance(gap, dict) else gap.model_dump()
@@ -141,9 +155,10 @@ def get_user_roadmap(current_user=Depends(get_current_user)):
 @router.get("/users/course-recommendations", response_model=List[CourseRecommendation], summary="Recomendar cursos personalizados para una habilidad")
 def get_user_course_recommendations(
     skill: str = Query(..., description="Slug de la habilidad"),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user=Depends(get_current_user)
 ):
-    profile = UserService.get_profile(current_user.id)
+    profile = UserService.get_profile(current_user.id, token=credentials.credentials)
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
