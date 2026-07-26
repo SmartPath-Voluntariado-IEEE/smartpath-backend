@@ -4,6 +4,7 @@ from services.auth_service import AuthService
 from services.user_service import UserService
 from schemas.auth import UserMeResponse
 from schemas.user import UserProfileUpdate, UserProfileResponse
+from services.vacancy_service import VacancyService
 
 router = APIRouter()
 security = HTTPBearer()
@@ -69,4 +70,22 @@ def upsert_user_profile(profile_data: UserProfileUpdate, current_user=Depends(ge
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se pudo crear o actualizar el perfil del usuario."
         )
-    return profile
+    return profile
+
+@router.get("/jobs/search", summary="Buscar ofertas de empleo")
+async def search_jobs():
+    return await VacancyService.search_jobs()
+
+@router.post(
+    "/jobs/collect",
+    summary="Recolectar y guardar ofertas de empleo",
+)
+async def collect_jobs():
+    return await VacancyService.collect_and_save_jobs()
+
+@router.post(
+    "/jobs/extract-skills",
+    summary="Extraer habilidades técnicas de las ofertas",
+)
+async def extract_job_skills():
+    return await VacancyService.extract_and_save_job_skills()
