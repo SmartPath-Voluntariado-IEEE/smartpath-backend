@@ -4,7 +4,7 @@ import unicodedata
 import httpx
 
 from core.config import settings
-from database.database import supabase_admin_client
+from database.database import get_admin_client
 
 
 class VacancyService:
@@ -43,7 +43,7 @@ class VacancyService:
                 json=body,
             )
 
-        # Genera un error claro si TheirStack responde con 401, 422, 500, etc.
+        # Produce un error claro si TheirStack responde 401, 402, 422, etc.
         response.raise_for_status()
 
         return response.json()
@@ -69,17 +69,27 @@ class VacancyService:
                 or job.get("seniority_level")
             )
 
-            # La columna seniority de Supabase espera texto.
             if isinstance(seniority, list):
-                seniority = ", ".join(str(value) for value in seniority)
+                seniority = ", ".join(
+                    str(value)
+                    for value in seniority
+                )
             elif seniority is not None:
                 seniority = str(seniority)
 
             jobs_to_insert.append(
                 {
-                    "company": job.get("company") or job.get("company_name"),
-                    "position": job.get("job_title") or job.get("title"),
-                    "salary": VacancyService._normalize_salary(salary),
+                    "company": (
+                        job.get("company")
+                        or job.get("company_name")
+                    ),
+                    "position": (
+                        job.get("job_title")
+                        or job.get("title")
+                    ),
+                    "salary": VacancyService._normalize_salary(
+                        salary
+                    ),
                     "seniority": seniority,
                     "description": (
                         job.get("description")
@@ -95,8 +105,10 @@ class VacancyService:
                 "saved": 0,
             }
 
+        admin_client = get_admin_client()
+
         result = (
-            supabase_admin_client
+            admin_client
             .table("jobs")
             .insert(jobs_to_insert)
             .execute()
@@ -105,7 +117,9 @@ class VacancyService:
         inserted_jobs = result.data or []
 
         return {
-            "message": "Vacantes recolectadas y guardadas correctamente.",
+            "message": (
+                "Vacantes recolectadas y guardadas correctamente."
+            ),
             "collected": len(source_jobs),
             "saved": len(inserted_jobs),
             "data": inserted_jobs,
@@ -115,9 +129,13 @@ class VacancyService:
     def _normalize_text(text: str) -> str:
         """
         Convierte el texto a minúsculas y elimina tildes.
-        Ejemplo: 'Visualización' -> 'visualizacion'
+
+        Ejemplo: 'Visualización' -> 'visualizacion'.
         """
-        normalized = unicodedata.normalize("NFD", text.lower())
+        normalized = unicodedata.normalize(
+            "NFD",
+            text.lower(),
+        )
 
         return "".join(
             character
@@ -126,21 +144,37 @@ class VacancyService:
         )
 
     @staticmethod
-    def _contains_alias(description: str, alias: str) -> bool:
+    def _contains_alias(
+        description: str,
+        alias: str,
+    ) -> bool:
         """
         Busca un alias como palabra o expresión completa.
 
-        Evita errores como encontrar 'java' dentro de 'javascript'.
+        Evita encontrar, por ejemplo, 'java' dentro de 'javascript'.
         """
-        normalized_description = VacancyService._normalize_text(description)
-        normalized_alias = VacancyService._normalize_text(alias.strip())
+        normalized_description = (
+            VacancyService._normalize_text(description)
+        )
+
+        normalized_alias = VacancyService._normalize_text(
+            alias.strip()
+        )
 
         if not normalized_alias:
             return False
 
-        pattern = rf"(?<!\w){re.escape(normalized_alias)}(?!\w)"
+        pattern = (
+            rf"(?<!\w){re.escape(normalized_alias)}(?!\w)"
+        )
 
-        return re.search(pattern, normalized_description) is not None
+        return (
+            re.search(
+                pattern,
+                normalized_description,
+            )
+            is not None
+        )
 
     @staticmethod
     async def extract_and_save_job_skills():
@@ -149,15 +183,17 @@ class VacancyService:
         y guarda las relaciones en job_skills.
         """
 
+        admin_client = get_admin_client()
+
         jobs_result = (
-            supabase_admin_client
+            admin_client
             .table("jobs")
             .select("id, description")
             .execute()
         )
 
         skills_result = (
-            supabase_admin_client
+            admin_client
             .table("skills")
             .select("id, name, aliases")
             .execute()
@@ -191,11 +227,16 @@ class VacancyService:
             for skill in skills:
                 aliases = skill.get("aliases") or []
 
-                # También usamos el nombre oficial como palabra clave.
-                search_terms = [skill.get("name", ""), *aliases]
+                search_terms = [
+                    skill.get("name", ""),
+                    *aliases,
+                ]
 
                 skill_found = any(
-                    VacancyService._contains_alias(description, term)
+                    VacancyService._contains_alias(
+                        description,
+                        term,
+                    )
                     for term in search_terms
                     if term
                 )
@@ -211,13 +252,15 @@ class VacancyService:
 
         if not relations:
             return {
-                "message": "No se encontraron habilidades técnicas.",
+                "message": (
+                    "No se encontraron habilidades técnicas."
+                ),
                 "jobs_analyzed": len(jobs),
                 "relations_created": 0,
             }
 
         result = (
-            supabase_admin_client
+            admin_client
             .table("job_skills")
             .upsert(
                 relations,

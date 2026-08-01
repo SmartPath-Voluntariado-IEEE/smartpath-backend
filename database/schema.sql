@@ -1,9 +1,17 @@
 -- ============================================
+-- ROLE TARGETS
+-- ============================================
+
+CREATE TABLE role_targets (
+    id VARCHAR(30) PRIMARY KEY,
+    label VARCHAR(100) NOT NULL
+);
+
+-- ============================================
 -- USERS
 -- ============================================
 
 CREATE TABLE users (
-
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     google_id TEXT UNIQUE,
     full_name VARCHAR(150) NOT NULL,
@@ -15,6 +23,9 @@ CREATE TABLE users (
     experience_level VARCHAR(50),
     weekly_hours INTEGER,
     professional_goal VARCHAR(100),
+    target_role_id VARCHAR(30) REFERENCES role_targets(id),
+    interests TEXT[],
+    learning_preferences TEXT[],
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -23,13 +34,23 @@ CREATE TABLE users (
 -- ============================================
 
 CREATE TABLE skills (
-
     id SERIAL PRIMARY KEY,
+    slug VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(100) UNIQUE NOT NULL,
     category VARCHAR(60),
     description TEXT,
     difficulty SMALLINT DEFAULT 1,
     aliases TEXT[]
+);
+
+-- ============================================
+-- ROLE TARGET SKILLS (relación roles <-> skills core)
+-- ============================================
+
+CREATE TABLE role_target_skills (
+    role_id VARCHAR(30) REFERENCES role_targets(id) ON DELETE CASCADE,
+    skill_slug VARCHAR(50) REFERENCES skills(slug) ON DELETE CASCADE,
+    PRIMARY KEY(role_id, skill_slug)
 );
 
 -- ============================================
@@ -40,10 +61,9 @@ CREATE TABLE user_skills (
     user_id UUID,
     skill_id INTEGER,
     level SMALLINT DEFAULT 1,
-    PRIMARY KEY(user_id,skill_id),
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(skill_id) REFERENCES skills(id)
-
+    PRIMARY KEY(user_id, skill_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(skill_id) REFERENCES skills(id) ON DELETE CASCADE
 );
 
 -- ============================================
@@ -52,13 +72,11 @@ CREATE TABLE user_skills (
 -- ============================================
 
 CREATE TABLE skill_prerequisites (
-
     skill_id INTEGER,
     prerequisite_skill_id INTEGER,
-    PRIMARY KEY(skill_id,prerequisite_skill_id),
-    FOREIGN KEY(skill_id) REFERENCES skills(id),
-    FOREIGN KEY(prerequisite_skill_id) REFERENCES skills(id)
-
+    PRIMARY KEY(skill_id, prerequisite_skill_id),
+    FOREIGN KEY(skill_id) REFERENCES skills(id) ON DELETE CASCADE,
+    FOREIGN KEY(prerequisite_skill_id) REFERENCES skills(id) ON DELETE CASCADE
 );
 
 -- ============================================
@@ -72,8 +90,9 @@ CREATE TABLE jobs (
     salary INTEGER,
     seniority VARCHAR(40),
     description TEXT,
+    location VARCHAR(100),
+    posted_at DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
 );
 
 -- ============================================
@@ -84,10 +103,9 @@ CREATE TABLE job_skills (
     job_id INTEGER,
     skill_id INTEGER,
     priority SMALLINT DEFAULT 1,
-    PRIMARY KEY(job_id,skill_id),
-    FOREIGN KEY(job_id) REFERENCES jobs(id),
-    FOREIGN KEY(skill_id) REFERENCES skills(id)
-
+    PRIMARY KEY(job_id, skill_id),
+    FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+    FOREIGN KEY(skill_id) REFERENCES skills(id) ON DELETE CASCADE
 );
 
 -- ============================================
@@ -101,11 +119,11 @@ CREATE TABLE courses (
     instructor VARCHAR(120),
     duration_hours INTEGER,
     language VARCHAR(40),
-    price NUMERIC(8,2),
+    price VARCHAR(50), -- Cambiado de NUMERIC a VARCHAR para almacenar textos como "Suscripción" o "S/ 39"
     rating NUMERIC(3,2),
+    level VARCHAR(20), -- Añadida columna level ("Básico", "Intermedio", "Avanzado")
     certificate BOOLEAN DEFAULT FALSE,
     url TEXT
-
 );
 
 -- ============================================
@@ -113,11 +131,9 @@ CREATE TABLE courses (
 -- ============================================
 
 CREATE TABLE course_skills (
-
     course_id INTEGER,
     skill_id INTEGER,
-    PRIMARY KEY(course_id,skill_id),
-    FOREIGN KEY(course_id) REFERENCES courses(id),
-    FOREIGN KEY(skill_id) REFERENCES skills(id)
-
+    PRIMARY KEY(course_id, skill_id),
+    FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    FOREIGN KEY(skill_id) REFERENCES skills(id) ON DELETE CASCADE
 );

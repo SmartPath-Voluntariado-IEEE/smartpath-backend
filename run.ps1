@@ -21,4 +21,4 @@ if (Test-Path ".env.local") {
 
 # 3. Lanzar servidor
 Write-Host "Levantando Uvicorn..." -ForegroundColor Yellow
-& .venv\Scripts\uvicorn.exe main:app --reload
+& ".\.venv\Scripts\python.exe" -m uvicorn main:app --reload
