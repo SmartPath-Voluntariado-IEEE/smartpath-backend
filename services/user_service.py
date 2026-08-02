@@ -56,6 +56,8 @@ class UserService:
         response = client.table("users").select("*").eq("id", user_id).execute()
         if response.data:
             profile = response.data[0]
+            if profile.get("target_months") is None:
+                profile["target_months"] = 6
             profile["skills"] = UserService.get_user_skills(user_id, token=token)
             return profile
         return None
@@ -73,6 +75,9 @@ class UserService:
             skills_list = update_dict.pop("skills", None)
             data.update(update_dict)
             
+            if data.get("target_months") is None:
+                data["target_months"] = 6
+            
             if not data.get("full_name"):
                 data["full_name"] = default_name or (email.split("@")[0] if email else "Usuario de SmartPath")
             
@@ -89,12 +94,24 @@ class UserService:
             if data.get("english_level"):
                 data["english_level"] = str(data["english_level"])[:30]
 
-            response = client.table("users").upsert(data).execute()
+            target_months_val = data.get("target_months", 6)
+            try:
+                response = client.table("users").upsert(data).execute()
+            except Exception as upsert_err:
+                print(f"⚠️ Aviso al hacer upsert con target_months: {upsert_err}. Reintentando compatibilidad...")
+                if "target_months" in data:
+                    data.pop("target_months", None)
+                    response = client.table("users").upsert(data).execute()
+                else:
+                    raise upsert_err
+
             if response.data:
                 if skills_list is not None:
                     UserService.save_user_skills(user_id, skills_list, token=token)
                     
                 profile = response.data[0]
+                if profile.get("target_months") is None:
+                    profile["target_months"] = target_months_val
                 profile["skills"] = UserService.get_user_skills(user_id, token=token)
                 return profile
             return None

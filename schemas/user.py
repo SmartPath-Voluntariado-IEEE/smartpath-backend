@@ -15,6 +15,7 @@ class UserProfileUpdate(BaseModel):
     english_level: Optional[str] = None
     experience_level: Optional[str] = None
     weekly_hours: Optional[int] = None
+    target_months: Optional[int] = 6
     professional_goal: Optional[str] = None
     target_role_id: Optional[str] = None
     interests: Optional[List[str]] = None
@@ -32,6 +33,7 @@ class UserProfileResponse(BaseModel):
     english_level: Optional[str] = None
     experience_level: Optional[str] = None
     weekly_hours: Optional[int] = None
+    target_months: Optional[int] = 6
     professional_goal: Optional[str] = None
     target_role_id: Optional[str] = None
     interests: Optional[List[str]] = None
