@@ -1,11 +1,20 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
 class UserSkillInput(BaseModel):
-    skill_slug: str
-    level: int
+    skill_slug: str = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+    )
+    level: int = Field(
+        ...,
+        ge=1,
+        le=5,
+        description="Nivel de dominio entre 1 y 5",
+    )
 
 class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -36,5 +45,5 @@ class UserProfileResponse(BaseModel):
     target_role_id: Optional[str] = None
     interests: Optional[List[str]] = None
     learning_preferences: Optional[List[str]] = None
-    skills: Optional[List[UserSkillInput]] = []
+    skills: List[UserSkillInput] = Field(default_factory=list)
     created_at: Optional[datetime] = None
