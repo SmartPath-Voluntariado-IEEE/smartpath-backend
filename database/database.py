@@ -55,15 +55,11 @@ def get_admin_client() -> Client:
 
 def get_db_client(token: Optional[str] = None) -> Client:
     """
-    Retorna el cliente adecuado según el tipo de operación.
+    Retorna un cliente que respeta la sesión y las políticas RLS.
 
-    - Si existe una clave administrativa, puede hacer bypass de RLS.
-    - Si se recibe el token de un usuario, trabaja respetando su sesión.
-    - Si no, devuelve el cliente anon base.
+    El cliente administrativo debe solicitarse explícitamente mediante
+    get_admin_client() únicamente para procesos internos del backend.
     """
-
-    if supabase_backend_key:
-        return get_admin_client()
 
     if token:
         client = create_client(
