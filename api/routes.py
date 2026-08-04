@@ -16,10 +16,20 @@ from schemas.catalog import (
     RoleTargetResponse,
     SkillResponse,
 )
+from schemas.onboarding import (
+    InterestAreaResponse,
+    OnboardingCareerRequest,
+    OnboardingInterestsRequest,
+    OnboardingNameRequest,
+    OnboardingStageRequest,
+    OnboardingStepResponse,
+    OnboardingTargetRoleRequest,
+)
 from schemas.user import UserProfileResponse, UserProfileUpdate
 from services.analysis_service import AnalysisService
 from services.auth_service import AuthService
 from services.catalog_service import CatalogService
+from services.onboarding import ChatbotOnboarding
 from services.user_service import UserService
 from services.vacancy_service import VacancyService
 
@@ -142,6 +152,141 @@ def upsert_user_profile(
         )
 
     return profile
+
+
+# ============================================
+# RUTAS DEL CHATBOT DE ONBOARDING
+# ============================================
+
+@router.get(
+    "/onboarding/start",
+    response_model=OnboardingStepResponse,
+    summary="Iniciar o retomar la conversación de onboarding",
+)
+def start_onboarding(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    default_name = (
+        current_user.user_metadata.get("full_name")
+        if current_user.user_metadata
+        else None
+    )
+
+    return ChatbotOnboarding.start(
+        user_id=current_user.id,
+        default_name=default_name,
+        token=credentials.credentials,
+    )
+
+
+@router.post(
+    "/onboarding/name",
+    response_model=OnboardingStepResponse,
+    summary="Guardar el nombre del usuario (HU-29)",
+)
+def save_onboarding_name(
+    payload: OnboardingNameRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    return ChatbotOnboarding.save_name(
+        user_id=current_user.id,
+        email=current_user.email,
+        full_name=payload.full_name,
+        token=credentials.credentials,
+    )
+
+
+@router.post(
+    "/onboarding/career",
+    response_model=OnboardingStepResponse,
+    summary="Guardar la carrera del usuario (HU-29)",
+)
+def save_onboarding_career(
+    payload: OnboardingCareerRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    return ChatbotOnboarding.save_career(
+        user_id=current_user.id,
+        email=current_user.email,
+        career=payload.career,
+        token=credentials.credentials,
+    )
+
+
+@router.post(
+    "/onboarding/stage",
+    response_model=OnboardingStepResponse,
+    summary="Guardar el ciclo académico o marcar como egresado (HU-29)",
+)
+def save_onboarding_stage(
+    payload: OnboardingStageRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    if payload.academic_cycle is None and not payload.is_graduated:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Debes enviar 'academic_cycle' o marcar "
+                "'is_graduated' como true."
+            ),
+        )
+
+    return ChatbotOnboarding.save_academic_stage(
+        user_id=current_user.id,
+        email=current_user.email,
+        academic_cycle=payload.academic_cycle,
+        is_graduated=payload.is_graduated,
+        token=credentials.credentials,
+    )
+
+
+@router.get(
+    "/onboarding/interest-areas",
+    response_model=List[InterestAreaResponse],
+    summary="Obtener las áreas de tecnología disponibles (HU-30)",
+)
+def get_onboarding_interest_areas():
+    return ChatbotOnboarding.get_interest_areas()
+
+
+@router.post(
+    "/onboarding/interests",
+    response_model=OnboardingStepResponse,
+    summary="Guardar áreas de interés y sugerir líneas de carrera (HU-30)",
+)
+def save_onboarding_interests(
+    payload: OnboardingInterestsRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    return ChatbotOnboarding.save_interests(
+        user_id=current_user.id,
+        email=current_user.email,
+        interest_ids=payload.interest_ids,
+        token=credentials.credentials,
+    )
+
+
+@router.post(
+    "/onboarding/target-role",
+    response_model=OnboardingStepResponse,
+    summary="Guardar el objetivo profesional del usuario (HU-31)",
+)
+def save_onboarding_target_role(
+    payload: OnboardingTargetRoleRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    return ChatbotOnboarding.save_target_role(
+        user_id=current_user.id,
+        email=current_user.email,
+        target_role_id=payload.target_role_id,
+        token=credentials.credentials,
+    )
 
 
 # ============================================
