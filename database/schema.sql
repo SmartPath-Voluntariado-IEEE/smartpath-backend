@@ -21,6 +21,7 @@ CREATE TABLE users (
     academic_cycle SMALLINT,
     english_level VARCHAR(30),
     experience_level VARCHAR(50),
+    role_experience TEXT,
     weekly_hours INTEGER,
     professional_goal VARCHAR(100),
     target_role_id VARCHAR(30) REFERENCES role_targets(id),

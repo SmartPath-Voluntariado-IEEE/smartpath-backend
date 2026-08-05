@@ -216,6 +216,21 @@ def get_catalog_courses(
 def get_catalog_roles():
     return CatalogService.get_all_role_targets()
 
+@router.get(
+    "/catalog/roles/{role_id}/skills",
+    response_model=List[SkillResponse],
+    summary="Obtener habilidades relacionadas con un rol",
+)
+def get_catalog_role_skills(role_id: str):
+    role_skills = CatalogService.get_role_skills(role_id)
+
+    if role_skills is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"El rol '{role_id}' no existe.",
+        )
+
+    return role_skills
 
 # ============================================
 # RUTAS DE ANÁLISIS Y ROADMAP
