@@ -182,18 +182,39 @@ class AnalysisService:
         # Filtrar los cursos que contienen la skill seleccionada
         matched = [c for c in courses_catalog if skill_slug in c.get("skill_slugs", [])]
         
+        user_prefs_lower = [p.lower() for p in preferences] if preferences else ["video"]
+        primary_style = user_prefs_lower[0] if user_prefs_lower else "video"
+
         recs = []
-        style = preferences[0] if preferences else "video"
         for c in matched:
+            course_title = c.get("title", "").lower()
+            course_hours = c.get("duration_hours", 10)
+            
+            # Determinar coincidencia de formato (HU1)
+            is_matched = any(p in course_title or (p == "video" and "video" in course_title) for p in user_prefs_lower)
+            format_style = primary_style if is_matched else "general"
+
+            # Calcular semanas estimadas según la disponibilidad semanal (HU2)
+            weeks_est = max(1, round(course_hours / max(availability, 1)))
+
             recs.append({
                 "title": c["title"],
                 "platform": c["platform"],
                 "url": c["url"],
                 "price": c["price"],
                 "rating": c["rating"],
-                "hours": c["duration_hours"],
+                "hours": course_hours,
                 "level": c["level"],
-                "style": style,
-                "why": f"Curso ideal para comenzar con {skill_name} enfocado en tu objetivo de {target_role or 'Desarrollador'}."
+                "style": format_style,
+                "why": f"Curso recomendado en formato {format_style} (~{weeks_est} sem a {availability}h/sem) enfocado en tu meta de {target_role or 'Desarrollador'}.",
+                "_matched": 1 if is_matched else 0,
             })
+
+        # Ordenar: primero los que coinciden con la preferencia de formato (HU1), luego por rating
+        recs.sort(key=lambda x: (x["_matched"], x["rating"]), reverse=True)
+        
+        # Remover campo auxiliar interno
+        for r in recs:
+            r.pop("_matched", None)
+
         return recs
