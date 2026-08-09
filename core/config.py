@@ -2,7 +2,6 @@ import os
 
 from dotenv import load_dotenv
 
-
 # Cargar .env.local si existe; de lo contrario, cargar .env
 env_path = ".env.local" if os.path.exists(".env.local") else ".env"
 load_dotenv(dotenv_path=env_path)

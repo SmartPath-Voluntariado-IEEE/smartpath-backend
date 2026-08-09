@@ -1,0 +1,58 @@
+name: Backend CI/CD (FastAPI)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-lint:
+    name: Test & Lint Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run Linter (Ruff)
+        run: |
+          ruff check .
+
+      - name: Run Unit & Smoke Tests (Pytest)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://example.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'dummy_key' }}
+          REDIRECT_URI: ${{ secrets.REDIRECT_URI || 'http://localhost:3000' }}
+        run: |
+          pytest tests/
+
+  deploy-render:
+    name: Trigger Render Deployment
+    needs: test-and-lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "⚠️ Secret RENDER_BACKEND_DEPLOY_HOOK not set. Skipping deploy trigger."
+          else
+            echo "🚀 Triggering Render Backend Deployment..."
+            curl -s -f -X POST "$RENDER_DEPLOY_HOOK"
+          fi

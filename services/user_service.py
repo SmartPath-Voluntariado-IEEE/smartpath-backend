@@ -1,10 +1,11 @@
-from typing import Optional
+
 from database.database import get_db_client
 from schemas.user import UserProfileUpdate
 
+
 class UserService:
     @staticmethod
-    def get_user_skills(user_id: str, token: Optional[str] = None):
+    def get_user_skills(user_id: str, token: str | None = None):
         client = get_db_client(token)
         response = client.table("user_skills").select("level, skills(slug)").eq("user_id", user_id).execute()
         skills = []
@@ -19,26 +20,26 @@ class UserService:
         return skills
 
     @staticmethod
-    def save_user_skills(user_id: str, skills_list, token: Optional[str] = None):
+    def save_user_skills(user_id: str, skills_list, token: str | None = None):
         if skills_list is None:
             return
-            
+
         client = get_db_client(token)
         client.table("user_skills").delete().eq("user_id", user_id).execute()
-        
+
         if not skills_list:
             return
-            
+
         skills_resp = client.table("skills").select("id, slug").execute()
         slug_to_id = {}
         if skills_resp.data:
             slug_to_id = {item["slug"]: item["id"] for item in skills_resp.data}
-            
+
         insert_data = []
         for sk in skills_list:
             slug = sk.skill_slug if hasattr(sk, "skill_slug") else sk.get("skill_slug")
             level = sk.level if hasattr(sk, "level") else sk.get("level", 1)
-            
+
             skill_id = slug_to_id.get(slug)
             if skill_id:
                 insert_data.append({
@@ -46,12 +47,12 @@ class UserService:
                     "skill_id": skill_id,
                     "level": level
                 })
-        
+
         if insert_data:
             client.table("user_skills").insert(insert_data).execute()
 
     @staticmethod
-    def get_profile(user_id: str, token: Optional[str] = None):
+    def get_profile(user_id: str, token: str | None = None):
         client = get_db_client(token)
         response = client.table("users").select("*").eq("id", user_id).execute()
         if response.data:
@@ -63,24 +64,24 @@ class UserService:
         return None
 
     @staticmethod
-    def upsert_profile(user_id: str, email: str, default_name: str, profile_data: UserProfileUpdate, token: Optional[str] = None):
+    def upsert_profile(user_id: str, email: str, default_name: str, profile_data: UserProfileUpdate, token: str | None = None):
         try:
             client = get_db_client(token)
             data = {
                 "id": user_id,
                 "email": email
             }
-            
+
             update_dict = profile_data.model_dump(exclude_none=True)
             skills_list = update_dict.pop("skills", None)
             data.update(update_dict)
-            
+
             if data.get("target_months") is None:
                 data["target_months"] = 6
-            
+
             if not data.get("full_name"):
                 data["full_name"] = default_name or (email.split("@")[0] if email else "Usuario de SmartPath")
-            
+
             if data.get("professional_goal"):
                 data["professional_goal"] = str(data["professional_goal"])[:100]
             if data.get("full_name"):
@@ -108,7 +109,7 @@ class UserService:
             if response.data:
                 if skills_list is not None:
                     UserService.save_user_skills(user_id, skills_list, token=token)
-                    
+
                 profile = response.data[0]
                 if profile.get("target_months") is None:
                     profile["target_months"] = target_months_val

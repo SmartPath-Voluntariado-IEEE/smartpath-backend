@@ -1,7 +1,7 @@
 import re
-from typing import List, Dict, Any
+from typing import Any
 
-SKILL_TIER: Dict[str, int] = {
+SKILL_TIER: dict[str, int] = {
     "git": 1, "github": 1, "sql": 1, "linux": 1, "excel": 1, "english": 1,
     "javascript": 2, "typescript": 2, "python": 2, "java": 2, "tailwind": 2, "pandas": 2,
     "react": 3, "nodejs": 3, "springboot": 3, "rest": 3, "powerbi": 3, "django": 3, "fastapi": 3,
@@ -10,7 +10,7 @@ SKILL_TIER: Dict[str, int] = {
     "kubernetes": 5, "aws": 5, "gcp": 5, "azure": 5, "tensorflow": 5,
 }
 
-def extract_skills_from_text(text: str, skills_catalog: List[Dict[str, Any]]) -> List[str]:
+def extract_skills_from_text(text: str, skills_catalog: list[dict[str, Any]]) -> list[str]:
     lower = " " + text.lower() + " "
     found = set()
     for s in skills_catalog:
@@ -28,14 +28,14 @@ def extract_skills_from_text(text: str, skills_catalog: List[Dict[str, Any]]) ->
 
 class AnalysisService:
     @staticmethod
-    def market_skill_frequency(jobs: List[Dict[str, Any]], skills_catalog: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def market_skill_frequency(jobs: list[dict[str, Any]], skills_catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
         counts = {}
         for j in jobs:
             text = f"{j.get('position', '')} {j.get('description', '')}"
             extracted = extract_skills_from_text(text, skills_catalog)
             for slug in extracted:
                 counts[slug] = counts.get(slug, 0) + 1
-                
+
         total = len(jobs)
         stats = []
         for slug, count in counts.items():
@@ -52,14 +52,14 @@ class AnalysisService:
         return stats
 
     @staticmethod
-    def analyze_gap(user_skills: List[Dict[str, Any]], target_role: Dict[str, Any], market: List[Dict[str, Any]], skills_catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def analyze_gap(user_skills: list[dict[str, Any]], target_role: dict[str, Any], market: list[dict[str, Any]], skills_catalog: list[dict[str, Any]]) -> dict[str, Any]:
         user_map = {us["skill_slug"]: us["level"] for us in user_skills}
         freq_map = {m["skill_slug"]: m["frequency"] for m in market}
-        
+
         mastered = []
         partial = []
         missing = []
-        
+
         core_slugs = target_role.get("core_skill_slugs", [])
         for slug in core_slugs:
             s_info = next((s for s in skills_catalog if s["slug"] == slug), None)
@@ -67,7 +67,7 @@ class AnalysisService:
                 continue
             lvl = user_map.get(slug)
             freq = freq_map.get(slug, 0.0)
-            
+
             if lvl and lvl >= 4:
                 mastered.append({
                     "skill_slug": slug,
@@ -89,7 +89,7 @@ class AnalysisService:
                     "marketFreq": freq,
                     "priority": freq * 100.0 - SKILL_TIER.get(slug, 3)
                 })
-                
+
         # Agregar habilidades top demandadas que no están en el core del rol ni tiene el usuario
         for m in market[:8]:
             slug = m["skill_slug"]
@@ -105,13 +105,13 @@ class AnalysisService:
                     "marketFreq": m["frequency"],
                     "priority": m["frequency"] * 60.0 - SKILL_TIER.get(slug, 3)
                 })
-                
+
         missing.sort(key=lambda x: x["priority"], reverse=True)
-        
+
         coverage = 0.0
         if core_slugs:
             coverage = (len(mastered) + len(partial) * 0.5) / len(core_slugs)
-            
+
         return {
             "target_role": target_role,
             "mastered": mastered,
@@ -121,9 +121,9 @@ class AnalysisService:
         }
 
     @staticmethod
-    def generate_roadmap(gap: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def generate_roadmap(gap: dict[str, Any]) -> list[dict[str, Any]]:
         buckets = {}
-        
+
         # Combinar missing y partial
         all_skills = []
         for m in gap["missing"]:
@@ -138,26 +138,26 @@ class AnalysisService:
                 "name": p["name"],
                 "marketFreq": p["marketFreq"]
             })
-            
+
         for m in all_skills:
             slug = m["skill_slug"]
             tier = SKILL_TIER.get(slug, 3)
-            
+
             if tier not in buckets:
                 buckets[tier] = []
-                
+
             if not any(x["skill_slug"] == slug for x in buckets[tier]):
                 # Estimar horas basándose en el tier
                 hours_by_tier = [0, 10, 25, 40, 30, 45]
                 est_hours = hours_by_tier[tier] if tier < len(hours_by_tier) else 30
-                
+
                 buckets[tier].append({
                     "skill_slug": slug,
                     "name": m["name"],
                     "marketFreq": m["marketFreq"],
                     "estHours": est_hours
                 })
-                
+
         labels = {
             1: "Fundamentos",
             2: "Lenguajes base",
@@ -165,7 +165,7 @@ class AnalysisService:
             4: "Contenedores & prácticas",
             5: "Cloud & especialización",
         }
-        
+
         roadmap = []
         for lvl in sorted(buckets.keys()):
             skills = buckets[lvl]
@@ -178,10 +178,10 @@ class AnalysisService:
         return roadmap
 
     @staticmethod
-    def recommend_courses(skill_slug: str, user_level: int, availability: int, preferences: List[str], target_role: str, courses_catalog: List[Dict[str, Any]], skill_name: str) -> List[Dict[str, Any]]:
+    def recommend_courses(skill_slug: str, user_level: int, availability: int, preferences: list[str], target_role: str, courses_catalog: list[dict[str, Any]], skill_name: str) -> list[dict[str, Any]]:
         # Filtrar los cursos que contienen la skill seleccionada
         matched = [c for c in courses_catalog if skill_slug in c.get("skill_slugs", [])]
-        
+
         user_prefs_lower = [p.lower() for p in preferences] if preferences else ["video"]
         primary_style = user_prefs_lower[0] if user_prefs_lower else "video"
 
@@ -189,7 +189,7 @@ class AnalysisService:
         for c in matched:
             course_title = c.get("title", "").lower()
             course_hours = c.get("duration_hours", 10)
-            
+
             # Determinar coincidencia de formato (HU1)
             is_matched = any(p in course_title or (p == "video" and "video" in course_title) for p in user_prefs_lower)
             format_style = primary_style if is_matched else "general"
@@ -212,7 +212,7 @@ class AnalysisService:
 
         # Ordenar: primero los que coinciden con la preferencia de formato (HU1), luego por rating
         recs.sort(key=lambda x: (x["_matched"], x["rating"]), reverse=True)
-        
+
         # Remover campo auxiliar interno
         for r in recs:
             r.pop("_matched", None)

@@ -1,7 +1,6 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================
 # REQUESTS
@@ -22,7 +21,7 @@ class OnboardingCareerRequest(BaseModel):
 
 
 class OnboardingStageRequest(BaseModel):
-    academic_cycle: Optional[int] = Field(
+    academic_cycle: int | None = Field(
         None,
         ge=1,
         le=12,
@@ -35,7 +34,7 @@ class OnboardingStageRequest(BaseModel):
 
 
 class OnboardingInterestsRequest(BaseModel):
-    interest_ids: List[str] = Field(
+    interest_ids: list[str] = Field(
         ...,
         description="Ids de las áreas de tecnología elegidas",
     )
@@ -72,15 +71,15 @@ class OnboardingStepResponse(BaseModel):
         ...,
         description="Lo que dice el chatbot al usuario",
     )
-    question: Optional[str] = Field(
+    question: str | None = Field(
         None,
         description="Pregunta del paso actual. Es null si ya terminó.",
     )
-    options: List[Dict[str, Any]] = Field(
+    options: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Opciones que el frontend puede mostrar como botones",
     )
-    profile: Optional[Dict[str, Any]] = Field(
+    profile: dict[str, Any] | None = Field(
         None,
         description="Perfil del usuario tras guardar la respuesta",
     )

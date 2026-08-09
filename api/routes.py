@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -6,7 +5,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from schemas.analysis import (
     CourseRecommendation,
     GapAnalysisResponse,
-    MarketSkillStat,
     RoadmapLevel,
 )
 from schemas.auth import UserMeResponse
@@ -32,7 +30,6 @@ from services.catalog_service import CatalogService
 from services.onboarding import ChatbotOnboarding
 from services.user_service import UserService
 from services.vacancy_service import VacancyService
-
 
 router = APIRouter()
 security = HTTPBearer()
@@ -62,7 +59,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=(
                 "Sesión inválida o expirada en el backend: "
-                f"{str(error)}"
+                f"{error!s}"
             ),
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -246,7 +243,7 @@ def save_onboarding_stage(
 
 @router.get(
     "/onboarding/interest-areas",
-    response_model=List[InterestAreaResponse],
+    response_model=list[InterestAreaResponse],
     summary="Obtener las áreas de tecnología disponibles (HU-30)",
 )
 def get_onboarding_interest_areas():
@@ -323,7 +320,7 @@ async def extract_job_skills():
 
 @router.get(
     "/catalog/skills",
-    response_model=List[SkillResponse],
+    response_model=list[SkillResponse],
     summary="Obtener catálogo de habilidades",
 )
 def get_catalog_skills():
@@ -332,7 +329,7 @@ def get_catalog_skills():
 
 @router.get(
     "/catalog/jobs",
-    response_model=List[JobResponse],
+    response_model=list[JobResponse],
     summary="Obtener catálogo de ofertas laborales",
 )
 def get_catalog_jobs():
@@ -341,11 +338,11 @@ def get_catalog_jobs():
 
 @router.get(
     "/catalog/courses",
-    response_model=List[CourseResponse],
+    response_model=list[CourseResponse],
     summary="Obtener catálogo de cursos",
 )
 def get_catalog_courses(
-    skill: Optional[str] = Query(
+    skill: str | None = Query(
         None,
         description="Slug de la habilidad a filtrar",
     ),
@@ -355,7 +352,7 @@ def get_catalog_courses(
 
 @router.get(
     "/catalog/roles",
-    response_model=List[RoleTargetResponse],
+    response_model=list[RoleTargetResponse],
     summary="Obtener catálogo de roles objetivos",
 )
 def get_catalog_roles():
@@ -363,7 +360,7 @@ def get_catalog_roles():
 
 @router.get(
     "/catalog/roles/{role_id}/skills",
-    response_model=List[SkillResponse],
+    response_model=list[SkillResponse],
     summary="Obtener habilidades relacionadas con un rol",
 )
 def get_catalog_role_skills(role_id: str):
@@ -454,7 +451,7 @@ def get_user_gap_analysis(
 
 @router.get(
     "/users/roadmap",
-    response_model=List[RoadmapLevel],
+    response_model=list[RoadmapLevel],
     summary="Generar roadmap personalizado para el usuario",
 )
 def get_user_roadmap(
@@ -477,7 +474,7 @@ def get_user_roadmap(
 
 @router.get(
     "/users/course-recommendations",
-    response_model=List[CourseRecommendation],
+    response_model=list[CourseRecommendation],
     summary="Recomendar cursos personalizados para una habilidad",
 )
 def get_user_course_recommendations(
