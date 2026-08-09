@@ -1,8 +1,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from services.course_collector_service import CourseCollectorService
-from services.course_ingestion_service import CourseIngestionService
+
 from schemas.analysis import (
     CourseRecommendation,
     GapAnalysisResponse,
@@ -28,6 +27,8 @@ from schemas.user import UserProfileResponse, UserProfileUpdate
 from services.analysis_service import AnalysisService
 from services.auth_service import AuthService
 from services.catalog_service import CatalogService
+from services.course_collector_service import CourseCollectorService
+from services.course_ingestion_service import CourseIngestionService
 from services.onboarding import ChatbotOnboarding
 from services.user_service import UserService
 from services.vacancy_service import VacancyService
