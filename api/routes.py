@@ -6,7 +6,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from schemas.analysis import (
     CourseRecommendation,
     GapAnalysisResponse,
-    MarketSkillStat,
     RoadmapLevel,
 )
 from schemas.auth import UserMeResponse
