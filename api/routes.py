@@ -27,6 +27,8 @@ from schemas.user import UserProfileResponse, UserProfileUpdate
 from services.analysis_service import AnalysisService
 from services.auth_service import AuthService
 from services.catalog_service import CatalogService
+from services.course_collector_service import CourseCollectorService
+from services.course_ingestion_service import CourseIngestionService
 from services.onboarding import ChatbotOnboarding
 from services.user_service import UserService
 from services.vacancy_service import VacancyService
@@ -335,6 +337,51 @@ def get_catalog_skills():
 def get_catalog_jobs():
     return CatalogService.get_all_jobs()
 
+@router.get(
+    "/courses/collect",
+    summary="Recolectar cursos desde fuentes externas",
+)
+@router.post(
+    "/courses/ingest",
+    summary="Recolectar, normalizar y almacenar cursos",
+)
+def ingest_courses(
+    query: str = Query(
+        ...,
+        min_length=1,
+        description="Tema o habilidad a buscar",
+    ),
+    max_items: int = Query(
+        10,
+        ge=1,
+        le=50,
+        description="Cantidad máxima de cursos a procesar",
+    ),
+    _current_user=Depends(get_current_user),
+):
+    return CourseIngestionService.ingest_courses(
+        search_query=query,
+        max_items=max_items,
+    )
+def collect_courses(
+    query: str = Query(
+        ...,
+        min_length=1,
+        description="Tema o habilidad a buscar",
+    ),
+    max_items: int = Query(
+        10,
+        ge=1,
+        le=50,
+        description="Cantidad máxima de cursos a recolectar",
+    ),
+    _current_user=Depends(get_current_user),
+
+):
+    return CourseCollectorService.collect_courses(
+        search_query=query,
+        max_items=max_items,
+    )
 
 @router.get(
     "/catalog/courses",
