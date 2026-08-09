@@ -12,12 +12,11 @@ de qué campos del perfil ya están completos. Así el backend sigue siendo
 stateless y el usuario puede retomar el onboarding donde lo dejó.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from schemas.user import UserProfileUpdate
 from services.catalog_service import CatalogService
 from services.user_service import UserService
-
 
 # Pasos de la conversación, en orden.
 STEP_ASK_NAME = "ask_name"
@@ -34,7 +33,7 @@ GRADUATED_LABEL = "Egresado"
 
 # Áreas de tecnología ofrecidas en la HU-30, con los roles de la tabla
 # role_targets que se sugieren para cada una.
-INTEREST_AREAS: List[Dict[str, Any]] = [
+INTEREST_AREAS: list[dict[str, Any]] = [
     {
         "id": "data-analytics",
         "label": "Data Analytics",
@@ -84,7 +83,7 @@ class ChatbotOnboarding:
     # ============================================
 
     @staticmethod
-    def get_current_step(profile: Optional[Dict[str, Any]]) -> str:
+    def get_current_step(profile: dict[str, Any] | None) -> str:
         """Deduce en qué paso va el usuario a partir de su perfil."""
 
         if not profile:
@@ -115,9 +114,9 @@ class ChatbotOnboarding:
     @staticmethod
     def start(
         user_id: str,
-        default_name: Optional[str] = None,
-        token: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        default_name: str | None = None,
+        token: str | None = None,
+    ) -> dict[str, Any]:
         """
         HU-29: saluda al usuario y le hace la primera pregunta pendiente.
 
@@ -159,8 +158,8 @@ class ChatbotOnboarding:
         user_id: str,
         email: str,
         full_name: str,
-        token: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        token: str | None = None,
+    ) -> dict[str, Any]:
         """HU-29: guarda el nombre del usuario y pregunta por su carrera."""
 
         full_name = (full_name or "").strip()
@@ -190,8 +189,8 @@ class ChatbotOnboarding:
         user_id: str,
         email: str,
         career: str,
-        token: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        token: str | None = None,
+    ) -> dict[str, Any]:
         """HU-29: guarda la carrera y pregunta por el ciclo."""
 
         career = (career or "").strip()
@@ -218,10 +217,10 @@ class ChatbotOnboarding:
     def save_academic_stage(
         user_id: str,
         email: str,
-        token: Optional[str] = None,
-        academic_cycle: Optional[int] = None,
+        token: str | None = None,
+        academic_cycle: int | None = None,
         is_graduated: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         HU-29: guarda el ciclo actual o marca al usuario como egresado.
 
@@ -266,7 +265,7 @@ class ChatbotOnboarding:
     # ============================================
 
     @staticmethod
-    def get_interest_areas() -> List[Dict[str, Any]]:
+    def get_interest_areas() -> list[dict[str, Any]]:
         """HU-30: catálogo de áreas de tecnología que puede elegir."""
 
         return [
@@ -279,7 +278,7 @@ class ChatbotOnboarding:
         ]
 
     @staticmethod
-    def suggest_roles(interest_ids: List[str]) -> List[Dict[str, Any]]:
+    def suggest_roles(interest_ids: list[str]) -> list[dict[str, Any]]:
         """
         HU-30: traduce las áreas elegidas en líneas de carrera concretas.
 
@@ -292,7 +291,7 @@ class ChatbotOnboarding:
 
         # Cuántas de las áreas elegidas apuntan a cada rol: mientras más
         # coincidencias, más arriba aparece la sugerencia.
-        scores: Dict[str, int] = {}
+        scores: dict[str, int] = {}
 
         for interest_id in interest_ids:
             area = next(
@@ -345,9 +344,9 @@ class ChatbotOnboarding:
     def save_interests(
         user_id: str,
         email: str,
-        interest_ids: List[str],
-        token: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        interest_ids: list[str],
+        token: str | None = None,
+    ) -> dict[str, Any]:
         """HU-30: guarda las áreas elegidas y sugiere líneas de carrera."""
 
         valid_ids = {area["id"] for area in INTEREST_AREAS}
@@ -400,8 +399,8 @@ class ChatbotOnboarding:
         user_id: str,
         email: str,
         target_role_id: str,
-        token: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        token: str | None = None,
+    ) -> dict[str, Any]:
         """HU-31: guarda el rol objetivo elegido y cierra el onboarding."""
 
         roles = CatalogService.get_all_role_targets()
@@ -449,9 +448,9 @@ class ChatbotOnboarding:
     def _update_profile(
         user_id: str,
         email: str,
-        token: Optional[str] = None,
+        token: str | None = None,
         **fields: Any,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Guarda campos parciales del perfil reutilizando UserService.
 
@@ -480,9 +479,9 @@ class ChatbotOnboarding:
 
     @staticmethod
     def _advance(
-        profile: Optional[Dict[str, Any]],
+        profile: dict[str, Any] | None,
         message: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Arma la respuesta del siguiente paso tras guardar un dato."""
 
         step = ChatbotOnboarding.get_current_step(profile)
@@ -499,8 +498,8 @@ class ChatbotOnboarding:
     def _retry(
         step: str,
         message: str,
-        options: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        options: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Repite el paso actual cuando la respuesta no fue válida."""
 
         return {
@@ -518,8 +517,8 @@ class ChatbotOnboarding:
     @staticmethod
     def _question_for_step(
         step: str,
-        default_name: Optional[str] = None,
-    ) -> Optional[str]:
+        default_name: str | None = None,
+    ) -> str | None:
         """Texto de la pregunta que corresponde a cada paso."""
 
         if step == STEP_ASK_NAME:
@@ -545,7 +544,7 @@ class ChatbotOnboarding:
         return None
 
     @staticmethod
-    def _options_for_step(step: str) -> List[Dict[str, Any]]:
+    def _options_for_step(step: str) -> list[dict[str, Any]]:
         """Opciones que el frontend puede mostrar como botones."""
 
         if step == STEP_ASK_INTERESTS:

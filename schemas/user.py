@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 
 class UserSkillInput(BaseModel):
     skill_slug: str = Field(
@@ -17,41 +18,41 @@ class UserSkillInput(BaseModel):
     )
 
 class UserProfileUpdate(BaseModel):
-    full_name: Optional[str] = None
-    career: Optional[str] = None
-    university: Optional[str] = None
-    academic_cycle: Optional[int] = None
-    english_level: Optional[str] = None
-    experience_level: Optional[str] = None
-    role_experience: Optional[str] = Field(
+    full_name: str | None = None
+    career: str | None = None
+    university: str | None = None
+    academic_cycle: int | None = None
+    english_level: str | None = None
+    experience_level: str | None = None
+    role_experience: str | None = Field(
         default=None,
         max_length=2000,
         description="Experiencia previa relacionada con el rol objetivo",
     )
-    weekly_hours: Optional[int] = None
-    target_months: Optional[int] = 6
-    professional_goal: Optional[str] = None
-    target_role_id: Optional[str] = None
-    interests: Optional[List[str]] = None
-    learning_preferences: Optional[List[str]] = None
-    skills: Optional[List[UserSkillInput]] = None
+    weekly_hours: int | None = None
+    target_months: int | None = 6
+    professional_goal: str | None = None
+    target_role_id: str | None = None
+    interests: list[str] | None = None
+    learning_preferences: list[str] | None = None
+    skills: list[UserSkillInput] | None = None
 
 class UserProfileResponse(BaseModel):
     id: UUID
-    google_id: Optional[str] = None
+    google_id: str | None = None
     full_name: str
     email: str
-    career: Optional[str] = None
-    university: Optional[str] = None
-    academic_cycle: Optional[int] = None
-    english_level: Optional[str] = None
-    experience_level: Optional[str] = None
-    role_experience: Optional[str] = None
-    weekly_hours: Optional[int] = None
-    target_months: Optional[int] = 6
-    professional_goal: Optional[str] = None
-    target_role_id: Optional[str] = None
-    interests: Optional[List[str]] = None
-    learning_preferences: Optional[List[str]] = None
-    skills: List[UserSkillInput] = Field(default_factory=list)
-    created_at: Optional[datetime] = None
+    career: str | None = None
+    university: str | None = None
+    academic_cycle: int | None = None
+    english_level: str | None = None
+    experience_level: str | None = None
+    role_experience: str | None = None
+    weekly_hours: int | None = None
+    target_months: int | None = 6
+    professional_goal: str | None = None
+    target_role_id: str | None = None
+    interests: list[str] | None = None
+    learning_preferences: list[str] | None = None
+    skills: list[UserSkillInput] = Field(default_factory=list)
+    created_at: datetime | None = None

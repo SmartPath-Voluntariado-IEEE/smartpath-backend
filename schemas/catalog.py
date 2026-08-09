@@ -1,38 +1,39 @@
-from pydantic import BaseModel
-from typing import Optional, List
 from datetime import date
+
+from pydantic import BaseModel
+
 
 class SkillResponse(BaseModel):
     id: int
     slug: str
     name: str
     category: str
-    description: Optional[str] = None
+    description: str | None = None
     difficulty: int
-    aliases: Optional[List[str]] = None
+    aliases: list[str] | None = None
 
 class JobResponse(BaseModel):
     id: int
-    company: Optional[str] = None
-    position: Optional[str] = None
-    salary: Optional[int] = None
-    seniority: Optional[str] = None
-    description: Optional[str] = None
-    location: Optional[str] = None
-    posted_at: Optional[date] = None
+    company: str | None = None
+    position: str | None = None
+    salary: int | None = None
+    seniority: str | None = None
+    description: str | None = None
+    location: str | None = None
+    posted_at: date | None = None
 
 class CourseResponse(BaseModel):
     id: int
-    platform: Optional[str] = None
-    title: Optional[str] = None
-    duration_hours: Optional[int] = None
-    price: Optional[str] = None
-    rating: Optional[float] = None
-    level: Optional[str] = None
-    url: Optional[str] = None
-    skill_slugs: List[str] = []
+    platform: str | None = None
+    title: str | None = None
+    duration_hours: int | None = None
+    price: str | None = None
+    rating: float | None = None
+    level: str | None = None
+    url: str | None = None
+    skill_slugs: list[str] = []
 
 class RoleTargetResponse(BaseModel):
     id: str
     label: str
-    core_skill_slugs: List[str] = []
+    core_skill_slugs: list[str] = []

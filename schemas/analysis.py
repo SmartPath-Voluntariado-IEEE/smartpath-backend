@@ -1,6 +1,8 @@
+
 from pydantic import BaseModel
-from typing import List
+
 from schemas.catalog import RoleTargetResponse
+
 
 class MarketSkillStat(BaseModel):
     skill_slug: str
@@ -29,9 +31,9 @@ class MissingSkill(BaseModel):
 
 class GapAnalysisResponse(BaseModel):
     target_role: RoleTargetResponse
-    mastered: List[MasteredSkill] = []
-    partial: List[PartialSkill] = []
-    missing: List[MissingSkill] = []
+    mastered: list[MasteredSkill] = []
+    partial: list[PartialSkill] = []
+    missing: list[MissingSkill] = []
     coverage: float
 
 class RoadmapSkill(BaseModel):
@@ -43,7 +45,7 @@ class RoadmapSkill(BaseModel):
 class RoadmapLevel(BaseModel):
     level: int
     label: str
-    skills: List[RoadmapSkill] = []
+    skills: list[RoadmapSkill] = []
 
 class CourseRecommendation(BaseModel):
     title: str

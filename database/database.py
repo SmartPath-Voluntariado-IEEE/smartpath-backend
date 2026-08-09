@@ -1,9 +1,7 @@
-from typing import Optional
 
 from supabase import Client, create_client
 
 from core.config import settings
-
 
 if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
     raise ValueError(
@@ -28,7 +26,7 @@ supabase_backend_key = (
 
 
 # Se crea solo cuando existe alguna clave administrativa.
-supabase_admin_client: Optional[Client] = (
+supabase_admin_client: Client | None = (
     create_client(
         settings.SUPABASE_URL,
         supabase_backend_key,
@@ -53,7 +51,7 @@ def get_admin_client() -> Client:
     return supabase_admin_client
 
 
-def get_db_client(token: Optional[str] = None) -> Client:
+def get_db_client(token: str | None = None) -> Client:
     """
     Retorna un cliente que respeta la sesión y las políticas RLS.
 
