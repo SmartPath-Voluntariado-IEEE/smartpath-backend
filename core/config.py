@@ -28,5 +28,15 @@ class Settings:
         "",
     )
 
+    APIFY_API_TOKEN: str = os.getenv(
+        "APIFY_API_TOKEN",
+        "",
+    )
+
+    APIFY_ACTOR_ID: str = os.getenv(
+        "APIFY_ACTOR_ID",
+        "crawlerbros~class-central-scraper",
+    )
+
 
 settings = Settings()
