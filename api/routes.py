@@ -339,30 +339,8 @@ def get_catalog_jobs():
 
 @router.get(
     "/courses/collect",
-    summary="Recolectar cursos desde fuentes externas",
+    summary="Recolectar cursos desde fuentes externas (sin guardar)",
 )
-@router.post(
-    "/courses/ingest",
-    summary="Recolectar, normalizar y almacenar cursos",
-)
-def ingest_courses(
-    query: str = Query(
-        ...,
-        min_length=1,
-        description="Tema o habilidad a buscar",
-    ),
-    max_items: int = Query(
-        10,
-        ge=1,
-        le=50,
-        description="Cantidad máxima de cursos a procesar",
-    ),
-    _current_user=Depends(get_current_user),
-):
-    return CourseIngestionService.ingest_courses(
-        search_query=query,
-        max_items=max_items,
-    )
 def collect_courses(
     query: str = Query(
         ...,
@@ -375,14 +353,54 @@ def collect_courses(
         le=50,
         description="Cantidad máxima de cursos a recolectar",
     ),
+    language: str = Query(
+        "spanish",
+        description="Idioma de los cursos (ej. 'spanish', 'english')",
+    ),
     _current_user=Depends(get_current_user),
-
 ):
     return CourseCollectorService.collect_courses(
         search_query=query,
         max_items=max_items,
+        language=language,
     )
 
+
+@router.post(
+    "/courses/ingest",
+    summary="Recolectar, normalizar, almacenar y vincular cursos a una habilidad",
+)
+def ingest_courses(
+    query: str = Query(
+        ...,
+        min_length=1,
+        description="Tema o habilidad a buscar (texto libre)",
+    ),
+    max_items: int = Query(
+        10,
+        ge=1,
+        le=50,
+        description="Cantidad máxima de cursos a procesar",
+    ),
+    language: str = Query(
+        "spanish",
+        description="Idioma de los cursos (ej. 'spanish', 'english')",
+    ),
+    skill_slug: str | None = Query(
+        None,
+        description=(
+            "Slug exacto de la habilidad en el catálogo (ej. 'python'), "
+            "para vincular los cursos en course_skills"
+        ),
+    ),
+    _current_user=Depends(get_current_user),
+):
+    return CourseIngestionService.ingest_courses(
+        search_query=query,
+        max_items=max_items,
+        language=language,
+        skill_slug=skill_slug,
+    )
 @router.get(
     "/catalog/courses",
     response_model=list[CourseResponse],

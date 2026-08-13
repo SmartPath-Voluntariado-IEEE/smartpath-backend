@@ -15,6 +15,7 @@ class CourseCollectorService:
     def collect_courses(
         search_query: str,
         max_items: int = 10,
+        language: str = "spanish",
     ):
         if not settings.APIFY_API_TOKEN:
             raise ValueError(
@@ -24,6 +25,7 @@ class CourseCollectorService:
         payload = {
             "mode": "search",
             "searchQuery": search_query,
+            "language": language,
             "freeOnly": False,
             "certificateOnly": False,
             "careerCertificateOnly": False,
