@@ -1,10 +1,8 @@
-import re
-import unicodedata
-
 import httpx
 
 from core.config import settings
 from database.database import get_admin_client
+from services.skill_matcher import mentions_skill
 
 
 class VacancyService:
@@ -126,57 +124,6 @@ class VacancyService:
         }
 
     @staticmethod
-    def _normalize_text(text: str) -> str:
-        """
-        Convierte el texto a minúsculas y elimina tildes.
-
-        Ejemplo: 'Visualización' -> 'visualizacion'.
-        """
-        normalized = unicodedata.normalize(
-            "NFD",
-            text.lower(),
-        )
-
-        return "".join(
-            character
-            for character in normalized
-            if unicodedata.category(character) != "Mn"
-        )
-
-    @staticmethod
-    def _contains_alias(
-        description: str,
-        alias: str,
-    ) -> bool:
-        """
-        Busca un alias como palabra o expresión completa.
-
-        Evita encontrar, por ejemplo, 'java' dentro de 'javascript'.
-        """
-        normalized_description = (
-            VacancyService._normalize_text(description)
-        )
-
-        normalized_alias = VacancyService._normalize_text(
-            alias.strip()
-        )
-
-        if not normalized_alias:
-            return False
-
-        pattern = (
-            rf"(?<!\w){re.escape(normalized_alias)}(?!\w)"
-        )
-
-        return (
-            re.search(
-                pattern,
-                normalized_description,
-            )
-            is not None
-        )
-
-    @staticmethod
     async def extract_and_save_job_skills():
         """
         Detecta habilidades en las descripciones de las vacantes
@@ -225,23 +172,7 @@ class VacancyService:
                 continue
 
             for skill in skills:
-                aliases = skill.get("aliases") or []
-
-                search_terms = [
-                    skill.get("name", ""),
-                    *aliases,
-                ]
-
-                skill_found = any(
-                    VacancyService._contains_alias(
-                        description,
-                        term,
-                    )
-                    for term in search_terms
-                    if term
-                )
-
-                if skill_found:
+                if mentions_skill(description, skill):
                     relations.append(
                         {
                             "job_id": job["id"],
