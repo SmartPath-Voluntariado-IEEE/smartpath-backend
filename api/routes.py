@@ -411,8 +411,23 @@ def get_catalog_courses(
         None,
         description="Slug de la habilidad a filtrar",
     ),
+    limit: int = Query(
+        12,
+        ge=1,
+        le=50,
+        description="Cantidad máxima de cursos por página",
+    ),
+    offset: int = Query(
+        0,
+        ge=0,
+        description="Cantidad de cursos a omitir para paginar",
+    ),
 ):
-    return CatalogService.get_all_courses(skill_slug=skill)
+    return CatalogService.get_all_courses(
+        skill_slug=skill,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
