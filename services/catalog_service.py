@@ -1,4 +1,5 @@
 from database.database import get_admin_client
+from services.course_pricing import is_free_course
 
 
 class CatalogService:
@@ -93,14 +94,26 @@ class CatalogService:
                 courses.append({
                     "id": item["id"],
                     "platform": item["platform"],
+                    "institution": item.get("institution"),
                     "title": item["title"],
                     "duration_hours": item["duration_hours"],
+                    "language": item.get("language"),
                     "price": item["price"],
+                    "is_free": is_free_course(item),
                     "rating": item["rating"],
                     "level": item["level"],
                     "url": item["url"],
                     "skill_slugs": slugs,
                 })
+
+        # Los cursos gratuitos encabezan el catálogo; dentro de cada grupo
+        # manda el rating (los cursos sin rating quedan al final).
+        courses.sort(
+            key=lambda c: (
+                not c["is_free"],
+                -(c["rating"] or 0),
+            )
+        )
 
         return courses
 

@@ -61,3 +61,30 @@ Esta estrategia evita implementar una integración independiente para cada plata
 ### Fuente alternativa
 
 freeCodeCamp puede mantenerse como una fuente secundaria mediante su repositorio oficial y GitHub API, en caso de requerir una fuente directa adicional.
+
+## Política de gratuidad
+
+SmartPath prioriza que el usuario pueda cerrar su brecha sin pagar. Por eso la recolección usa el parámetro `freeOnly` del actor en `true` por defecto, lo que habilita la oferta gratuita que Class Central ya indexa:
+
+- **edX** — cursos abiertos de Harvard, MIT y otras universidades.
+- **freeCodeCamp**
+- **YouTube**
+- **Coursera** — modalidad de auditoría gratuita.
+
+`freeOnly` queda expuesto como query param en `/courses/collect` y `/courses/ingest`. Se desactiva solo para completar habilidades que no tengan oferta gratuita disponible.
+
+### Criterio de "gratis"
+
+`Free Trial Available` **no** cuenta como gratuito: el curso se cobra al terminar la prueba. El criterio único vive en `services/course_pricing.py`.
+
+La gratuidad se persiste como el booleano `courses.is_free`, no como la etiqueta de texto `price`. Para las filas anteriores a la migración, el criterio cae automáticamente a `price`.
+
+### Campos agregados
+
+`institution` se conserva durante la normalización, porque el prestigio de la institución (Harvard, MIT, freeCodeCamp) es parte del valor de un curso gratuito.
+
+Ambas columnas se crean con `docs/migrations/001_courses_free_metadata.sql`.
+
+### Efecto en las recomendaciones
+
+El orden de `/users/course-recommendations` es: **gratuidad → coincidencia con el formato preferido → rating**. El catálogo (`/catalog/courses`) también devuelve los gratuitos primero.

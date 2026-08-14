@@ -25,9 +25,12 @@ class JobResponse(BaseModel):
 class CourseResponse(BaseModel):
     id: int
     platform: str | None = None
+    institution: str | None = None
     title: str | None = None
     duration_hours: int | None = None
+    language: str | None = None
     price: str | None = None
+    is_free: bool = False
     rating: float | None = None
     level: str | None = None
     url: str | None = None

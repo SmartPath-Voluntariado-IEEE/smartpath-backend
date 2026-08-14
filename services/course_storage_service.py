@@ -1,5 +1,37 @@
 from database.database import get_admin_client
 
+# Columnas agregadas por docs/migrations/001_courses_free_metadata.sql. Hasta
+# que la migración corra en Supabase, se descartan al insertar para no romper
+# la ingesta. Cachea el resultado porque el esquema no cambia en caliente.
+OPTIONAL_COLUMNS = ("institution", "is_free")
+
+_missing_columns_cache: set[str] | None = None
+
+
+def _get_missing_columns() -> set[str]:
+    global _missing_columns_cache
+
+    if _missing_columns_cache is not None:
+        return _missing_columns_cache
+
+    supabase = get_admin_client()
+    missing = set()
+
+    for column in OPTIONAL_COLUMNS:
+        try:
+            (
+                supabase.table("courses")
+                .select(column)
+                .limit(1)
+                .execute()
+            )
+        except Exception:
+            missing.add(column)
+
+    _missing_columns_cache = missing
+
+    return missing
+
 
 class CourseStorageService:
 
@@ -7,6 +39,15 @@ class CourseStorageService:
     def save_course(course: dict) -> dict:
 
         supabase = get_admin_client()
+
+        missing = _get_missing_columns()
+
+        if missing:
+            course = {
+                key: value
+                for key, value in course.items()
+                if key not in missing
+            }
 
         course_url = course.get("url")
 

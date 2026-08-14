@@ -357,12 +357,21 @@ def collect_courses(
         "spanish",
         description="Idioma de los cursos (ej. 'spanish', 'english')",
     ),
+    free_only: bool = Query(
+        True,
+        description=(
+            "Recolectar solo cursos gratuitos. SmartPath prioriza la "
+            "oferta gratuita, así que se desactiva únicamente para "
+            "completar habilidades sin cursos gratis disponibles."
+        ),
+    ),
     _current_user=Depends(get_current_user),
 ):
     return CourseCollectorService.collect_courses(
         search_query=query,
         max_items=max_items,
         language=language,
+        free_only=free_only,
     )
 
 
@@ -393,6 +402,14 @@ def ingest_courses(
             "para vincular los cursos en course_skills"
         ),
     ),
+    free_only: bool = Query(
+        True,
+        description=(
+            "Ingerir solo cursos gratuitos. SmartPath prioriza la oferta "
+            "gratuita, así que se desactiva únicamente para completar "
+            "habilidades sin cursos gratis disponibles."
+        ),
+    ),
     _current_user=Depends(get_current_user),
 ):
     return CourseIngestionService.ingest_courses(
@@ -400,6 +417,7 @@ def ingest_courses(
         max_items=max_items,
         language=language,
         skill_slug=skill_slug,
+        free_only=free_only,
     )
 @router.get(
     "/catalog/courses",
@@ -534,7 +552,19 @@ def get_user_roadmap(
         else gap.model_dump()
     )
 
-    return AnalysisService.generate_roadmap(gap_dict)
+    # El roadmap se refina con el perfil (disponibilidad, plazo, intereses) y
+    # con la oferta real de cursos, no solo con la brecha de habilidades.
+    profile = UserService.get_profile(
+        current_user.id,
+        token=credentials.credentials,
+    )
+
+    return AnalysisService.generate_roadmap(
+        gap_dict,
+        profile=profile,
+        courses_catalog=CatalogService.get_all_courses(),
+        skills_catalog=CatalogService.get_all_skills(),
+    )
 
 
 @router.get(
@@ -610,6 +640,7 @@ def get_user_course_recommendations(
         target_role=target_role,
         courses_catalog=courses_catalog,
         skill_name=skill_info["name"],
+        english_level=profile.get("english_level"),
     )
 
     return recommendations

@@ -17,6 +17,7 @@ class CourseIngestionService:
         max_items: int = 10,
         language: str = "spanish",
         skill_slug: str | None = None,
+        free_only: bool = True,
     ) -> dict:
 
         # 0. Resolver el skill_id antes de procesar
@@ -38,6 +39,7 @@ class CourseIngestionService:
             search_query=search_query,
             max_items=max_items,
             language=language,
+            free_only=free_only,
         )
 
         results = []
@@ -86,6 +88,7 @@ class CourseIngestionService:
         return {
             "query": search_query,
             "language": language,
+            "free_only": free_only,
             "skill_slug": skill_slug,
             "collected": len(raw_courses),
             "created": created,
