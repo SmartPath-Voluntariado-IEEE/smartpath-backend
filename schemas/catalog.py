@@ -26,10 +26,13 @@ class CourseResponse(BaseModel):
     id: int
     platform: str | None = None
     title: str | None = None
+    instructor: str | None = None
     duration_hours: int | None = None
+    language: str | None = None
     price: str | None = None
     rating: float | None = None
     level: str | None = None
+    certificate: bool = False
     url: str | None = None
     skill_slugs: list[str] = []
 

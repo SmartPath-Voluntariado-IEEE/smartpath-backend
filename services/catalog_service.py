@@ -29,7 +29,11 @@ class CatalogService:
         return response.data if response.data else []
 
     @staticmethod
-    def get_all_courses(skill_slug: str = None):
+    def get_all_courses(
+        skill_slug: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ):
         client = get_admin_client()
 
         if skill_slug:
@@ -62,21 +66,24 @@ class CatalogService:
                 for item in course_skill_response.data
             ]
 
-            response = (
+            query = (
                 client
                 .table("courses")
                 .select("*, course_skills(skills(slug))")
                 .in_("id", course_ids)
-                .execute()
             )
 
         else:
-            response = (
+            query = (
                 client
                 .table("courses")
                 .select("*, course_skills(skills(slug))")
-                .execute()
             )
+
+        if limit is not None:
+            query = query.range(offset, offset + limit - 1)
+
+        response = query.execute()
 
         courses = []
 
@@ -94,10 +101,13 @@ class CatalogService:
                     "id": item["id"],
                     "platform": item["platform"],
                     "title": item["title"],
+                    "instructor": item.get("instructor"),
                     "duration_hours": item["duration_hours"],
+                    "language": item.get("language"),
                     "price": item["price"],
                     "rating": item["rating"],
                     "level": item["level"],
+                    "certificate": item.get("certificate", False),
                     "url": item["url"],
                     "skill_slugs": slugs,
                 })
