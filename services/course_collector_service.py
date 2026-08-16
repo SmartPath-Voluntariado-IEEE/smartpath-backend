@@ -16,17 +16,21 @@ class CourseCollectorService:
         search_query: str,
         max_items: int = 10,
         language: str = "spanish",
+        free_only: bool = True,
     ):
         if not settings.APIFY_API_TOKEN:
             raise ValueError(
                 "Falta APIFY_API_TOKEN en las variables de entorno."
             )
 
+        # `freeOnly` activa la oferta gratuita de la fuente (edX con Harvard y
+        # MIT, freeCodeCamp, YouTube y las auditorías de Coursera), que es la
+        # que SmartPath prioriza.
         payload = {
             "mode": "search",
             "searchQuery": search_query,
             "language": language,
-            "freeOnly": False,
+            "freeOnly": free_only,
             "certificateOnly": False,
             "careerCertificateOnly": False,
             "universityOnly": False,

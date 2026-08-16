@@ -1,5 +1,37 @@
 from database.database import get_admin_client
 
+# Columnas agregadas por docs/migrations/001_courses_free_metadata.sql. Hasta
+# que la migración corra en Supabase, se descartan al insertar para no romper
+# la ingesta. Cachea el resultado porque el esquema no cambia en caliente.
+OPTIONAL_COLUMNS = ("institution", "is_free")
+
+_missing_columns_cache: set[str] | None = None
+
+
+def _get_missing_columns() -> set[str]:
+    global _missing_columns_cache
+
+    if _missing_columns_cache is not None:
+        return _missing_columns_cache
+
+    supabase = get_admin_client()
+    missing = set()
+
+    for column in OPTIONAL_COLUMNS:
+        try:
+            (
+                supabase.table("courses")
+                .select(column)
+                .limit(1)
+                .execute()
+            )
+        except Exception:
+            missing.add(column)
+
+    _missing_columns_cache = missing
+
+    return missing
+
 
 class CourseStorageService:
 
@@ -7,6 +39,15 @@ class CourseStorageService:
     def save_course(course: dict) -> dict:
 
         supabase = get_admin_client()
+
+        missing = _get_missing_columns()
+
+        if missing:
+            course = {
+                key: value
+                for key, value in course.items()
+                if key not in missing
+            }
 
         course_url = course.get("url")
 
@@ -59,26 +100,67 @@ class CourseStorageService:
         return None
 
     @staticmethod
-    def link_course_skill(course_id: str, skill_id: str) -> bool:
+    def link_course_skills(
+        course_id: str,
+        skill_ids: list[str],
+    ) -> int:
+        """
+        Vincula un curso con varias habilidades y devuelve cuántos vínculos
+        son nuevos.
+
+        Un curso cubre más de una habilidad ('React y Node.js desde cero'),
+        así que la unidad de trabajo es la lista, no el par suelto. Consulta
+        los vínculos existentes una sola vez para no pagar una ida y vuelta
+        por habilidad durante el backfill.
+        """
+
+        if not skill_ids:
+            return 0
+
         supabase = get_admin_client()
 
-        # Evitar duplicados en la tabla intermedia
         existing = (
             supabase
             .table("course_skills")
-            .select("course_id")
+            .select("skill_id")
             .eq("course_id", course_id)
-            .eq("skill_id", skill_id)
-            .limit(1)
             .execute()
         )
 
-        if existing.data:
-            return False  # ya estaba vinculado
+        already_linked = {
+            row["skill_id"]
+            for row in (existing.data or [])
+        }
 
-        supabase.table("course_skills").insert({
-            "course_id": course_id,
-            "skill_id": skill_id,
-        }).execute()
+        # `dict.fromkeys` descarta repetidos conservando el orden: el mismo
+        # slug puede llegar dos veces desde el título y desde la query.
+        new_ids = [
+            skill_id
+            for skill_id in dict.fromkeys(skill_ids)
+            if skill_id not in already_linked
+        ]
 
-        return True
+        if not new_ids:
+            return 0
+
+        supabase.table("course_skills").insert([
+            {"course_id": course_id, "skill_id": skill_id}
+            for skill_id in new_ids
+        ]).execute()
+
+        return len(new_ids)
+
+    @staticmethod
+    def get_courses_for_linking() -> list[dict]:
+        """Cursos existentes con el texto que el matcher necesita."""
+
+        supabase = get_admin_client()
+
+        response = (
+            supabase
+            .table("courses")
+            .select("id, title")
+            .execute()
+        )
+
+        return response.data or []
