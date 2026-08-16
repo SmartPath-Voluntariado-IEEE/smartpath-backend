@@ -10,11 +10,13 @@ def test_catalog_courses_exposes_course_detail_fields(monkeypatch):
     catalog_course = {
         "id": 1,
         "platform": "Coursera",
+        "institution": None,
         "title": "Python para análisis de datos",
         "instructor": "Ada Lovelace",
         "duration_hours": 18,
         "language": "Español",
         "price": "Gratis",
+        "is_free": False,
         "rating": 4.8,
         "level": "Básico",
         "certificate": True,
