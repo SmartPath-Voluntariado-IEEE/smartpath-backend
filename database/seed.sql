@@ -197,3 +197,97 @@ SELECT c.id, s.id FROM courses c, skills s WHERE c.title = 'Linux para Desarroll
 
 INSERT INTO course_skills (course_id, skill_id)
 SELECT c.id, s.id FROM courses c, skills s WHERE c.title = 'Tailwind CSS moderno' AND s.slug = 'tailwind';
+
+-- ============================================
+-- SEED: EVALUATION QUESTIONS
+-- HU-51 / HU-52
+-- ============================================
+
+-- PYTHON
+
+INSERT INTO public.evaluation_questions
+(skill_slug, question, options, correct_option)
+SELECT
+    'python',
+    '¿Qué palabra clave se utiliza para definir una función en Python?',
+    '["func", "def", "function", "lambda"]'::jsonb,
+    1
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.evaluation_questions
+    WHERE skill_slug = 'python'
+      AND question = '¿Qué palabra clave se utiliza para definir una función en Python?'
+);
+
+INSERT INTO public.evaluation_questions
+(skill_slug, question, options, correct_option)
+SELECT
+    'python',
+    '¿Qué devuelve len([1, 2, 3])?',
+    '["2", "3", "4", "Error"]'::jsonb,
+    1
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.evaluation_questions
+    WHERE skill_slug = 'python'
+      AND question = '¿Qué devuelve len([1, 2, 3])?'
+);
+
+INSERT INTO public.evaluation_questions
+(skill_slug, question, options, correct_option)
+SELECT
+    'python',
+    '¿Cuál de estas estructuras es mutable en Python?',
+    '["tuple", "str", "list", "int"]'::jsonb,
+    2
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.evaluation_questions
+    WHERE skill_slug = 'python'
+      AND question = '¿Cuál de estas estructuras es mutable en Python?'
+);
+
+
+-- SQL
+
+INSERT INTO public.evaluation_questions
+(skill_slug, question, options, correct_option)
+SELECT
+    'sql',
+    '¿Qué comando se utiliza para consultar datos de una tabla?',
+    '["SELECT", "UPDATE", "DELETE", "DROP"]'::jsonb,
+    0
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.evaluation_questions
+    WHERE skill_slug = 'sql'
+      AND question = '¿Qué comando se utiliza para consultar datos de una tabla?'
+);
+
+INSERT INTO public.evaluation_questions
+(skill_slug, question, options, correct_option)
+SELECT
+    'sql',
+    '¿Qué cláusula permite filtrar filas en SQL?',
+    '["ORDER BY", "WHERE", "GROUP BY", "JOIN"]'::jsonb,
+    1
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.evaluation_questions
+    WHERE skill_slug = 'sql'
+      AND question = '¿Qué cláusula permite filtrar filas en SQL?'
+);
+
+INSERT INTO public.evaluation_questions
+(skill_slug, question, options, correct_option)
+SELECT
+    'sql',
+    '¿Qué comando agrega una nueva fila a una tabla?',
+    '["ALTER", "SELECT", "INSERT", "CREATE"]'::jsonb,
+    2
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.evaluation_questions
+    WHERE skill_slug = 'sql'
+      AND question = '¿Qué comando agrega una nueva fila a una tabla?'
+);
