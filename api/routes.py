@@ -14,6 +14,11 @@ from schemas.catalog import (
     RoleTargetResponse,
     SkillResponse,
 )
+from schemas.evaluation import (
+    EvaluationQuestionResponse,
+    EvaluationResultResponse,
+    EvaluationSubmitRequest,
+)
 from schemas.onboarding import (
     InterestAreaResponse,
     OnboardingCareerRequest,
@@ -29,6 +34,7 @@ from services.auth_service import AuthService
 from services.catalog_service import CatalogService
 from services.course_collector_service import CourseCollectorService
 from services.course_ingestion_service import CourseIngestionService
+from services.evaluation_service import EvaluationService
 from services.onboarding import ChatbotOnboarding
 from services.user_service import UserService
 from services.vacancy_service import VacancyService
@@ -471,6 +477,89 @@ def get_catalog_role_skills(role_id: str):
         )
 
     return role_skills
+
+
+# ============================================
+# EVALUACIONES Y PROGRESO
+# ============================================
+
+
+@router.get(
+    "/evaluations/{skill_slug}",
+    response_model=list[EvaluationQuestionResponse],
+    summary="Obtener evaluación de un módulo",
+)
+def get_module_evaluation(
+    skill_slug: str,
+    _current_user=Depends(get_current_user),
+):
+    questions = EvaluationService.get_questions(skill_slug)
+
+    if not questions:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No existe una evaluación para este módulo.",
+        )
+
+    return questions
+
+
+@router.post(
+    "/evaluations/{skill_slug}/submit",
+    response_model=EvaluationResultResponse,
+    summary="Enviar evaluación y actualizar progreso",
+)
+def submit_module_evaluation(
+    skill_slug: str,
+    payload: EvaluationSubmitRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    try:
+        result = EvaluationService.submit_evaluation(
+            user_id=current_user.id,
+            skill_slug=skill_slug,
+            answers=[
+                answer.model_dump()
+                for answer in payload.answers
+            ],
+            token=credentials.credentials,
+        )
+
+    except LookupError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(error),
+        ) from error
+
+    roadmap = get_user_roadmap(
+        credentials,
+        current_user,
+    )
+
+    roadmap_skills = [
+        skill["skill_slug"]
+        for level in roadmap
+        for skill in level["skills"]
+    ]
+
+    progress = EvaluationService.calculate_roadmap_progress(
+        user_id=current_user.id,
+        roadmap_skills=roadmap_skills,
+        token=credentials.credentials,
+    )
+
+    return {
+        **result,
+        **progress,
+    }
+
 
 # ============================================
 # RUTAS DE ANÁLISIS Y ROADMAP
