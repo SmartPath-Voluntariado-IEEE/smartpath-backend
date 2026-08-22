@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from schemas.analysis import (
@@ -38,6 +38,9 @@ from services.evaluation_service import EvaluationService
 from services.onboarding import ChatbotOnboarding
 from services.user_service import UserService
 from services.vacancy_service import VacancyService
+from services.module_extraction_service import ModuleExtractionService
+from services.module_quiz_service import ModuleQuizService
+from services.course_progress_service import CourseProgressService
 
 router = APIRouter()
 security = HTTPBearer()
@@ -748,3 +751,117 @@ def get_user_course_recommendations(
     )
 
     return recommendations
+
+
+@router.post(
+    "/roadmap/skills/{skill_slug}/select-course",
+    summary="Vincula un curso a una skill del roadmap",
+)
+def select_course_for_skill(
+    skill_slug: str,
+    course_id: int = Query(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    return CourseProgressService.select_course_for_skill(
+        user_id=current_user.id,
+        skill_slug=skill_slug,
+        course_id=course_id,
+        token=credentials.credentials,
+    )
+
+
+@router.delete(
+    "/roadmap/skills/{skill_slug}/course",
+    summary="Desvincula el curso de una skill y resetea su progreso",
+)
+def unlink_course_from_skill(
+    skill_slug: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    CourseProgressService.unlink_course_from_skill(
+        user_id=current_user.id,
+        skill_slug=skill_slug,
+        token=credentials.credentials,
+    )
+    return {"status": "unlinked"}
+
+
+@router.get(
+    "/courses/{course_id}/modules",
+    summary="Obtiene (o extrae si no existen) los módulos de un curso",
+)
+def get_course_modules(
+    course_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    try:
+        return ModuleExtractionService.get_or_extract_modules(
+            course_id,
+            user_id=current_user.id,
+            token=credentials.credentials,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except RuntimeError as error:
+        raise HTTPException(status_code=502, detail=str(error))
+
+
+@router.get(
+    "/modules/{module_id}/quiz",
+    summary="Obtiene (o genera) el examen de 10 preguntas de un módulo",
+)
+def get_module_quiz(
+    module_id: str,
+    _current_user=Depends(get_current_user),
+):
+    try:
+        return ModuleQuizService.get_or_generate_quiz(module_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+
+
+@router.post(
+    "/modules/{module_id}/submit",
+    summary="Envía las respuestas del examen de un módulo",
+)
+def submit_module_quiz(
+    module_id: str,
+    answers: list[dict] = Body(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    try:
+        return ModuleQuizService.submit_module_attempt(
+            user_id=current_user.id,
+            module_id=module_id,
+            answers=answers,
+            token=credentials.credentials,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+
+
+@router.get(
+    "/dashboard/course-progress",
+    summary="Resumen de progreso de cursos por skill para el dashboard",
+)
+def get_dashboard_course_progress(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    roadmap_gap = get_user_gap_analysis(credentials, current_user)
+    roadmap = AnalysisService.generate_roadmap(
+        roadmap_gap if isinstance(roadmap_gap, dict) else roadmap_gap.model_dump()
+    )
+    all_skills = [s for level in roadmap for s in level["skills"]]
+
+    return CourseProgressService.get_dashboard_summary(
+        user_id=current_user.id,
+        roadmap_skills=all_skills,
+        token=credentials.credentials,
+    )
