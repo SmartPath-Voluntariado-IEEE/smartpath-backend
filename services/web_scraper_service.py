@@ -1,0 +1,38 @@
+import httpx
+from bs4 import BeautifulSoup
+
+
+class WebScraperService:
+
+    @staticmethod
+    def scrape_course_page(url: str, max_chars: int = 15000) -> str:
+        """
+        Descarga el HTML de la página del curso y extrae el texto visible,
+        limitado a max_chars para no exceder el contexto del modelo.
+        """
+        try:
+            response = httpx.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; SmartPathBot/1.0)"},
+                timeout=30,
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise RuntimeError(
+                f"No se pudo acceder a la URL del curso: {error}"
+            ) from error
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Quita scripts, estilos y navegación, que no aportan contenido real
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+
+        text = soup.get_text(separator="\n", strip=True)
+
+        # Colapsa líneas vacías repetidas
+        lines = [line for line in text.splitlines() if line.strip()]
+        clean_text = "\n".join(lines)
+
+        return clean_text[:max_chars]
