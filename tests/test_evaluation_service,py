@@ -1,0 +1,127 @@
+import pytest
+from unittest.mock import MagicMock, patch
+from services.evaluation_service import evaluation_service, PASSING_SCORE
+
+
+class TestSubmitEvaluation:
+
+    def test_raises_when_no_questions_exist(self):
+        with patch("services.evaluation_service.get_admin_client") as mock_admin:
+            mock_admin.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+
+            with pytest.raises(LookupError, match="No existe una evaluación"):
+                evaluation_service.submit_evaluation(
+                    user_id="u1", skill_slug="python", answers=[], token="t"
+                )
+
+    def test_raises_when_answers_dont_match_all_questions(self):
+        with patch("services.evaluation_service.get_admin_client") as mock_admin:
+            mock_admin.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                {"id": 1, "correct_option": 2},
+                {"id": 2, "correct_option": 1},
+            ]
+            # Solo responde 1 de 2 preguntas
+            answers = [{"question_id": 1, "selected_option": 2}]
+
+            with pytest.raises(ValueError, match="todas las preguntas"):
+                evaluation_service.submit_evaluation(
+                    user_id="u1", skill_slug="python", answers=answers, token="t"
+                )
+
+    def test_raises_on_duplicate_answer_ids(self):
+        with patch("services.evaluation_service.get_admin_client") as mock_admin:
+            mock_admin.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                {"id": 1, "correct_option": 2},
+            ]
+            answers = [
+                {"question_id": 1, "selected_option": 2},
+                {"question_id": 1, "selected_option": 1},  # duplicado
+            ]
+
+            with pytest.raises(ValueError):
+                evaluation_service.submit_evaluation(
+                    user_id="u1", skill_slug="python", answers=answers, token="t"
+                )
+
+    def test_score_calculation_and_passed_flag(self):
+        # 3 de 4 correctas = 75% >= PASSING_SCORE (70) → passed=True
+        with patch("services.evaluation_service.get_admin_client") as mock_admin, \
+             patch("services.evaluation_service.get_db_client") as mock_db:
+
+            mock_admin.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                {"id": 1, "correct_option": 1},
+                {"id": 2, "correct_option": 2},
+                {"id": 3, "correct_option": 1},
+                {"id": 4, "correct_option": 2},
+            ]
+            answers = [
+                {"question_id": 1, "selected_option": 1},  # correcta
+                {"question_id": 2, "selected_option": 2},  # correcta
+                {"question_id": 3, "selected_option": 2},  # incorrecta
+                {"question_id": 4, "selected_option": 2},  # correcta
+            ]
+
+            mock_db.return_value.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value.data = []
+            mock_db.return_value.table.return_value.insert.return_value.execute.return_value = MagicMock()
+
+            result = EvaluationService.submit_evaluation(
+                user_id="u1", skill_slug="python", answers=answers, token="t"
+            )
+
+            assert result["score"] == 75.0
+            assert result["passed"] is True
+            assert result["correct_answers"] == 3
+
+    def test_module_stays_completed_even_if_retry_fails(self):
+        """
+        Caso importante: si el usuario ya completó el módulo antes
+        (status='completed') y falla un intento nuevo, el status NO
+        debe retroceder a 'in_progress'.
+        """
+        with patch("services.evaluation_service.get_admin_client") as mock_admin, \
+             patch("services.evaluation_service.get_db_client") as mock_db:
+
+            mock_admin.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                {"id": 1, "correct_option": 1},
+            ]
+            answers = [{"question_id": 1, "selected_option": 2}]  # incorrecta
+
+            mock_db.return_value.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value.data = [
+                {"status": "completed", "best_score": 90.0, "completed_at": "2026-01-01T00:00:00"}
+            ]
+            mock_db.return_value.table.return_value.insert.return_value.execute.return_value = MagicMock()
+            mock_db.return_value.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock()
+
+            result = EvaluationService.submit_evaluation(
+                user_id="u1", skill_slug="python", answers=answers, token="t"
+            )
+
+            assert result["module_status"] == "completed"
+            assert result["best_score"] == 90.0  # conserva el mejor score histórico
+
+
+class TestRoadmapProgress:
+
+    def test_empty_roadmap_returns_zero(self):
+        result = EvaluationService.calculate_roadmap_progress(
+            user_id="u1", roadmap_skills=[], token="t"
+        )
+        assert result["roadmap_progress_percentage"] == 0.0
+        assert result["total_modules"] == 0
+
+    def test_progress_percentage_calculation(self):
+        with patch("services.evaluation_service.get_db_client") as mock_db:
+            mock_db.return_value.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+                {"skill_slug": "python", "status": "completed"},
+                {"skill_slug": "sql", "status": "completed"},
+            ]
+
+            result = EvaluationService.calculate_roadmap_progress(
+                user_id="u1",
+                roadmap_skills=["python", "sql", "docker", "aws"],
+                token="t",
+            )
+
+            assert result["completed_modules"] == 2
+            assert result["total_modules"] == 4
+            assert result["roadmap_progress_percentage"] == 50.0

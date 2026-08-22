@@ -1,0 +1,99 @@
+from database.database import get_admin_client, get_db_client
+from services.web_scraper_service import WebScraperService
+from services.gemini_client import extract_modules_from_content
+
+
+class ModuleExtractionService:
+
+    @staticmethod
+    def get_or_extract_modules(
+        course_id: int,
+        user_id: str | None = None,
+        token: str | None = None,
+    ) -> list[dict]:
+        supabase = get_admin_client()
+
+        existing = (
+            supabase.table("course_modules")
+            .select("*")
+            .eq("course_id", course_id)
+            .order("module_order")
+            .execute()
+        )
+
+        if existing.data:
+            modules = existing.data
+        else:
+            course_result = (
+                supabase.table("courses")
+                .select("title, url")
+                .eq("id", course_id)
+                .limit(1)
+                .execute()
+            )
+
+            if not course_result.data:
+                raise LookupError(f"No existe el curso con id {course_id}.")
+
+            course = course_result.data[0]
+
+            scraped_text = WebScraperService.scrape_course_page(course["url"])
+            extracted = extract_modules_from_content(course["title"], scraped_text)
+
+            rows_to_insert = [
+                {
+                    "course_id": course_id,
+                    "module_order": module["order"],
+                    "title": module["title"],
+                    "content_summary": module["content_summary"],
+                }
+                for module in extracted
+            ]
+
+            result = (
+                supabase.table("course_modules")
+                .insert(rows_to_insert)
+                .execute()
+            )
+
+            modules = result.data
+
+        if user_id:
+            modules = ModuleExtractionService._attach_progress(
+                modules, user_id, token
+            )
+
+        return modules
+
+    @staticmethod
+    def _attach_progress(
+        modules: list[dict], user_id: str, token: str | None
+    ) -> list[dict]:
+        """
+        Agrega score/passed/attempts de cada módulo para este usuario,
+        consultando user_module_completion.
+        """
+        supabase = get_db_client(token) if token else get_admin_client()
+
+        module_ids = [m["id"] for m in modules]
+
+        completion_result = (
+            supabase.table("user_module_completion")
+            .select("module_id, score, passed, attempts, best_score")
+            .eq("user_id", user_id)
+            .in_("module_id", module_ids)
+            .execute()
+        )
+
+        completion_map = {
+            row["module_id"]: row for row in (completion_result.data or [])
+        }
+
+        for module in modules:
+            record = completion_map.get(module["id"])
+            module["score"] = record["score"] if record else None
+            module["best_score"] = record["best_score"] if record else None
+            module["passed"] = bool(record["passed"]) if record else False
+            module["attempts"] = record["attempts"] if record else 0
+
+        return modules
