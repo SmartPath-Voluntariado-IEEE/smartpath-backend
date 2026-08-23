@@ -80,7 +80,6 @@ class CatalogService:
     @staticmethod
     def get_market_overview():
         """Aggregate market data: skill demand, salary ranges, top companies."""
-        client = get_admin_client()
 
         # 1. Get all jobs (with skill_slugs computed)
         jobs = CatalogService.get_all_jobs()

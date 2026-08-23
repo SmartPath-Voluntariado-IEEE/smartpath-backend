@@ -1,5 +1,6 @@
 import os
 from typing import ClassVar
+
 from dotenv import load_dotenv
 
 # Cargar .env.local si existe; de lo contrario, cargar .env
