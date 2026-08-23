@@ -291,3 +291,17 @@ WHERE NOT EXISTS (
     WHERE skill_slug = 'sql'
       AND question = '¿Qué comando agrega una nueva fila a una tabla?'
 );
+
+-- ============================================
+-- ACHIEVEMENTS SEED
+-- ============================================
+
+INSERT INTO achievements (id, title, description, category, icon_name, badge_color, criteria_type, criteria_value, xp_points)
+VALUES
+    ('first-module-passed', 'Primer Paso', 'Aprueba tu primera evaluación de módulo con éxito.', 'modules', 'Target', 'purple', 'passed_modules_count', 1, 50),
+    ('perfect-score', 'Puntaje Perfecto', 'Obtén una calificación perfecta del 100% en cualquier test.', 'quizzes', 'Award', 'emerald', 'perfect_score', 1, 100),
+    ('three-modules-passed', 'Explorador Imparable', 'Completa 3 módulos evaluados satisfactoriamente.', 'modules', 'Zap', 'indigo', 'passed_modules_count', 3, 150),
+    ('course-completed', 'Curso Conquistado', 'Aprueba todos los módulos de un curso activo.', 'courses', 'BookOpen', 'amber', 'completed_course', 1, 200),
+    ('level-1-mastered', 'Fundamentos Dominados', 'Domina todas las habilidades clave del Nivel 1 en tu Roadmap.', 'roadmap', 'Trophy', 'orange', 'level_completed', 1, 300),
+    ('streak-active', 'Hábito de Hierro', 'Mantén una racha de estudio activa en la plataforma.', 'streak', 'Flame', 'orange', 'streak_days', 3, 100)
+ON CONFLICT (id) DO NOTHING;
