@@ -242,3 +242,30 @@ FOR UPDATE
 TO authenticated
 USING ((SELECT auth.uid()) = user_id)
 WITH CHECK ((SELECT auth.uid()) = user_id);
+
+-- ============================================
+-- ACHIEVEMENTS (GAMIFICACIÓN)
+-- ============================================
+
+CREATE TABLE achievements (
+    id VARCHAR(50) PRIMARY KEY,
+    title VARCHAR(120) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(50) DEFAULT 'general',
+    icon_name VARCHAR(50) NOT NULL,
+    badge_color VARCHAR(30) DEFAULT 'purple',
+    criteria_type VARCHAR(50) NOT NULL,
+    criteria_value INTEGER DEFAULT 1,
+    xp_points INTEGER DEFAULT 50,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE user_achievements (
+    user_id UUID,
+    achievement_id VARCHAR(50),
+    unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    PRIMARY KEY(user_id, achievement_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(achievement_id) REFERENCES achievements(id) ON DELETE CASCADE
+);

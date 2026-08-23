@@ -2,6 +2,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from schemas.achievement import (
+    AchievementResponse,
+    SyncAchievementsRequest,
+    UnlockAchievementRequest,
+    UserAchievementResponse,
+)
 from schemas.analysis import (
     CourseRecommendation,
     GapAnalysisResponse,
@@ -29,6 +35,7 @@ from schemas.onboarding import (
     OnboardingTargetRoleRequest,
 )
 from schemas.user import UserProfileResponse, UserProfileUpdate
+from services.achievement_service import AchievementService
 from services.analysis_service import AnalysisService
 from services.auth_service import AuthService
 from services.catalog_service import CatalogService
@@ -865,3 +872,71 @@ def get_dashboard_course_progress(
         roadmap_skills=all_skills,
         token=credentials.credentials,
     )
+
+
+# ============================================
+# RUTAS DE LOGROS Y GAMIFICACIÓN
+# ============================================
+
+@router.get(
+    "/catalog/achievements",
+    response_model=list[AchievementResponse],
+    summary="Obtener catálogo maestro de logros e insignias",
+)
+def get_catalog_achievements():
+    return AchievementService.get_all_achievements()
+
+
+@router.get(
+    "/users/achievements",
+    response_model=list[UserAchievementResponse],
+    summary="Obtener logros desbloqueados del usuario actual",
+)
+def get_user_achievements(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    return AchievementService.get_user_achievements(
+        user_id=current_user.id,
+        token=credentials.credentials,
+    )
+
+
+@router.post(
+    "/users/achievements/unlock",
+    summary="Desbloquear manualmente un logro para el usuario actual",
+)
+def unlock_user_achievement(
+    payload: UnlockAchievementRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    success = AchievementService.unlock_achievement(
+        user_id=current_user.id,
+        achievement_id=payload.achievement_id,
+        metadata=payload.metadata,
+        token=credentials.credentials,
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se pudo desbloquear el logro {payload.achievement_id}",
+        )
+    return {"status": "success", "unlocked": payload.achievement_id}
+
+
+@router.post(
+    "/users/achievements/sync",
+    response_model=list[UserAchievementResponse],
+    summary="Sincronizar y evaluar hitos del usuario actual",
+)
+def sync_user_achievements(
+    payload: SyncAchievementsRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    return AchievementService.sync_and_evaluate(
+        user_id=current_user.id,
+        sync_req=payload,
+        token=credentials.credentials,
+    )

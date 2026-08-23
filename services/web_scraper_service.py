@@ -10,18 +10,20 @@ class WebScraperService:
         Descarga el HTML de la página del curso y extrae el texto visible,
         limitado a max_chars para no exceder el contexto del modelo.
         """
+        if not url or url.strip() == "#" or not url.startswith("http"):
+            return ""
+
         try:
             response = httpx.get(
                 url,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; SmartPathBot/1.0)"},
-                timeout=30,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+                timeout=15,
                 follow_redirects=True,
             )
             response.raise_for_status()
-        except httpx.HTTPError as error:
-            raise RuntimeError(
-                f"No se pudo acceder a la URL del curso: {error}"
-            ) from error
+        except Exception as error:
+            print(f"⚠️ [SCRAPER] No se pudo descargar {url}: {error}")
+            return ""
 
         soup = BeautifulSoup(response.text, "html.parser")
 
