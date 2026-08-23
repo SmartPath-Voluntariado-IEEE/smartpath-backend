@@ -1,5 +1,7 @@
 import json
+
 import google.generativeai as genai
+
 from core.config import settings
 
 if settings.GEMINI_API_KEY:
@@ -59,13 +61,13 @@ Genera entre 3 y 6 módulos secuenciales claros.
         },
         {
             "order": 2,
-            "title": f"2. Desarrollo Práctico y Casos de Uso",
+            "title": "2. Desarrollo Práctico y Casos de Uso",
             "content_summary": f"Implementación de funcionalidades, buenas prácticas y desarrollo de ejercicios prácticos con {course_title}."
         },
         {
             "order": 3,
-            "title": f"3. Optimización, Pruebas y Despliegue",
-            "content_summary": f"Estrategias avanzadas, testing automatizado, resolución de errores y preparación para entornos de producción."
+            "title": "3. Optimización, Pruebas y Despliegue",
+            "content_summary": "Estrategias avanzadas, testing automatizado, resolución de errores y preparación para entornos de producción."
         }
     ]
 

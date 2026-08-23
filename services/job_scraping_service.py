@@ -24,7 +24,6 @@ from datetime import date, datetime
 from core.config import settings
 from database.database import get_admin_client
 
-
 # Términos de búsqueda por rol objetivo. Varios por rol porque los portales
 # peruanos publican el mismo puesto con nombres muy distintos ("Desarrollador
 # Backend", "Backend Developer"), y buscar solo en inglés pierde la mitad de
@@ -171,7 +170,7 @@ class JobScrapingService:
 
         average = sum(amounts) / len(amounts)
 
-        return int(round(average * factor))
+        return round(average * factor)
 
     @staticmethod
     def _seniority(title: str | None, job_level: str | None) -> str | None:

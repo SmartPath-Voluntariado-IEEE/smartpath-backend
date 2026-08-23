@@ -1,4 +1,5 @@
 import os
+from typing import ClassVar
 
 from dotenv import load_dotenv
 
@@ -49,7 +50,7 @@ class Settings:
     # Portales a consultar. Indeed es el que mejor cobertura tiene en Perú;
     # LinkedIn se deja fuera por defecto porque limita por IP muy rápido y
     # una corrida bloqueada deja el lote entero vacío.
-    JOBSPY_SITES: list[str] = [
+    JOBSPY_SITES: ClassVar[list[str]] = [
         site.strip()
         for site in os.getenv("JOBSPY_SITES", "indeed").split(",")
         if site.strip()
@@ -72,7 +73,7 @@ class Settings:
         os.getenv("JOBSPY_DELAY_SECONDS", "3")
     )
 
-    JOBSPY_PROXIES: list[str] = [
+    JOBSPY_PROXIES: ClassVar[list[str]] = [
         proxy.strip()
         for proxy in os.getenv("JOBSPY_PROXIES", "").split(",")
         if proxy.strip()

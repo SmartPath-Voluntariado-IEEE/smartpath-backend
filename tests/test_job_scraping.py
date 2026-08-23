@@ -8,7 +8,6 @@ periodicidades distintas y el nivel del puesto deducido del título.
 
 from services.job_scraping_service import JobScrapingService
 
-
 NAN = float("nan")
 
 

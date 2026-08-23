@@ -1,6 +1,6 @@
 from database.database import get_admin_client, get_db_client
-from services.web_scraper_service import WebScraperService
 from services.gemini_client import extract_modules_from_content
+from services.web_scraper_service import WebScraperService
 
 
 class ModuleExtractionService:
