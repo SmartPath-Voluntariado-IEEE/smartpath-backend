@@ -16,7 +16,9 @@ from schemas.analysis import (
 from schemas.auth import UserMeResponse
 from schemas.catalog import (
     CourseResponse,
+    JobMatchResponse,
     JobResponse,
+    MarketOverviewResponse,
     RoleTargetResponse,
     SkillResponse,
 )
@@ -352,6 +354,25 @@ def get_catalog_skills():
 )
 def get_catalog_jobs():
     return CatalogService.get_all_jobs()
+
+
+@router.get(
+    "/market/overview",
+    response_model=MarketOverviewResponse,
+    summary="Resumen del mercado laboral: demanda de skills, salarios y empresas top",
+)
+def get_market_overview():
+    return CatalogService.get_market_overview()
+
+
+@router.get(
+    "/users/job-matches",
+    response_model=list[JobMatchResponse],
+    summary="Compatibilidad del usuario con ofertas laborales",
+)
+def get_user_job_matches(current_user=Depends(get_current_user)):
+    return CatalogService.get_user_job_matches(current_user.id)
+
 
 @router.get(
     "/courses/collect",
