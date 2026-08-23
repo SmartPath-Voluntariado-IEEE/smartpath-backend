@@ -42,5 +42,41 @@ class Settings:
         "",
     )
 
+    # ------------------------------------------------
+    # HU-57: recolección de ofertas laborales (JobSpy)
+    # ------------------------------------------------
+
+    # Portales a consultar. Indeed es el que mejor cobertura tiene en Perú;
+    # LinkedIn se deja fuera por defecto porque limita por IP muy rápido y
+    # una corrida bloqueada deja el lote entero vacío.
+    JOBSPY_SITES: list[str] = [
+        site.strip()
+        for site in os.getenv("JOBSPY_SITES", "indeed").split(",")
+        if site.strip()
+    ]
+
+    JOBSPY_COUNTRY: str = os.getenv("JOBSPY_COUNTRY", "peru")
+
+    JOBSPY_LOCATION: str = os.getenv("JOBSPY_LOCATION", "Peru")
+
+    # Resultados por término de búsqueda y por portal.
+    JOBSPY_RESULTS_PER_TERM: int = int(
+        os.getenv("JOBSPY_RESULTS_PER_TERM", "25")
+    )
+
+    # Antigüedad máxima de una oferta, en horas (720 = 30 días).
+    JOBSPY_HOURS_OLD: int = int(os.getenv("JOBSPY_HOURS_OLD", "720"))
+
+    # Pausa entre búsquedas para no gatillar el rate limit del portal.
+    JOBSPY_DELAY_SECONDS: float = float(
+        os.getenv("JOBSPY_DELAY_SECONDS", "3")
+    )
+
+    JOBSPY_PROXIES: list[str] = [
+        proxy.strip()
+        for proxy in os.getenv("JOBSPY_PROXIES", "").split(",")
+        if proxy.strip()
+    ]
+
 
 settings = Settings()

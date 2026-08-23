@@ -113,170 +113,21 @@ INSERT INTO role_target_skills (role_id, skill_slug) VALUES
 ON CONFLICT (role_id, skill_slug) DO NOTHING;
 
 -- ============================================
--- SEED: JOBS
+-- OFERTAS LABORALES: ya no se siembran (HU-57)
 -- ============================================
-
-INSERT INTO jobs (company, position, salary, seniority, description, location, posted_at) VALUES
-('Rappi Perú', 'Practicante Backend Developer', 1800, 'Practicante', 'Buscamos practicante de Backend con conocimientos en Java, Spring Boot, REST APIs, Git, Docker y PostgreSQL. Deseable AWS y Scrum.', 'Lima, Remoto', '2026-07-10'),
-('BCP', 'Practicante Data Analyst', 1600, 'Practicante', 'Practicante de Data Analyst con SQL, Excel, Power BI y Python (Pandas). Inglés intermedio deseable.', 'Lima, Perú', '2026-07-12'),
-('Culqi', 'Full Stack Developer Jr', 3500, 'Junior', 'Desarrollador Full Stack con React, TypeScript, Node.js, Tailwind, PostgreSQL, Git y GitHub. Docker y AWS son un plus.', 'Remoto', '2026-07-14'),
-('Interbank', 'Practicante Data Engineer', 2000, 'Practicante', 'Python, SQL, PostgreSQL, Airflow, Docker, GCP. Conocimientos en Pandas y Linux valorados.', 'Lima, Perú', '2026-07-08'),
-('Yape', 'Frontend Developer Trainee', 2200, 'Practicante', 'React, Next.js, TypeScript, Tailwind CSS, Git. Conocimientos de REST APIs y buenas prácticas.', 'Lima, Híbrido', '2026-07-15'),
-('NTT Data', 'Practicante Machine Learning', 2000, 'Practicante', 'Python, Pandas, TensorFlow, SQL. Deseable AWS, Docker e inglés intermedio.', 'Lima, Perú', '2026-07-11'),
-('Belcorp', 'Backend Java Semi Senior', NULL, 'Semi Senior', 'Java, Spring Boot, REST APIs, Kubernetes, Docker, AWS, PostgreSQL, Git. Scrum.', 'Remoto', '2026-07-09'),
-('Fintech Startup', 'Full Stack Node + React', NULL, 'Junior', 'Node.js, JavaScript, TypeScript, React, MongoDB, REST APIs, Git, GitHub. Docker deseable.', 'Remoto', '2026-07-13'),
-('Globant', 'Practicante DevOps', NULL, 'Practicante', 'Linux, Docker, Kubernetes, AWS, Git, GitHub. Python es un plus.', 'Lima, Remoto', '2026-07-07'),
-('Alicorp', 'Data Analyst Junior', NULL, 'Junior', 'SQL, Power BI, Excel, Python, MySQL. Inglés intermedio.', 'Lima, Perú', '2026-07-12'),
--- Nuevas ofertas agosto 2026
-('Niubiz', 'Frontend Developer Jr', 3200, 'Junior', 'React, TypeScript, Next.js, Tailwind CSS, Git, GitHub. Experiencia con APIs REST. Metodologías ágiles.', 'Lima, Híbrido', '2026-08-01'),
-('BBVA Perú', 'Practicante Data Engineer', 1800, 'Practicante', 'Python, SQL, PostgreSQL, Docker, Linux, AWS. Conocimiento de Pandas y ETL pipelines.', 'Lima, Perú', '2026-08-03'),
-('Crehana', 'Full Stack Developer', 5500, 'Semi Senior', 'TypeScript, React, Node.js, PostgreSQL, Docker, AWS, Git, REST APIs. Deseable GraphQL y Kubernetes.', 'Remoto', '2026-08-05'),
-('Rimac Seguros', 'Backend Developer Jr', 3800, 'Junior', 'Java, Spring Boot, REST APIs, SQL, PostgreSQL, Git, Docker. Scrum y buenas prácticas de código.', 'Lima, Híbrido', '2026-08-06'),
-('Platanitos.com', 'Practicante Frontend', 1500, 'Practicante', 'React, JavaScript, Tailwind CSS, Git. Nociones de Next.js y TypeScript valoradas.', 'Lima, Presencial', '2026-08-07'),
-('BCP Digital', 'Data Analyst Semi Senior', 6500, 'Semi Senior', 'SQL, Python, Pandas, Power BI, Excel, PostgreSQL. Inglés avanzado. Experiencia en dashboards ejecutivos.', 'Lima, Híbrido', '2026-08-08'),
-('Laboratoria', 'DevOps Engineer Jr', 4200, 'Junior', 'Linux, Docker, Kubernetes, AWS, Git, Python, GitHub. CI/CD pipelines y monitoreo.', 'Remoto', '2026-08-10'),
-('Konfío Perú', 'ML Engineer Practicante', 2200, 'Practicante', 'Python, Pandas, TensorFlow, SQL, Docker. Conocimiento de estadística y machine learning.', 'Lima, Remoto', '2026-08-12'),
-('Movistar Tech', 'Backend Python Semi Senior', 7000, 'Semi Senior', 'Python, FastAPI, PostgreSQL, Docker, AWS, Git, REST APIs, Redis. Kubernetes deseable.', 'Lima, Remoto', '2026-08-14'),
-('Startup EdTech', 'Full Stack React + Node Jr', 3000, 'Junior', 'React, Next.js, TypeScript, Node.js, PostgreSQL, Tailwind CSS, Git. Docker es un plus.', 'Remoto', '2026-08-15'),
-('Entel Perú', 'Practicante Ciberseguridad', 1600, 'Practicante', 'Seguridad de redes, Linux, firewalls, TCP/IP, SIEM. Conocimientos de ethical hacking valorados.', 'Lima, Presencial', '2026-08-16'),
-('Accenture Perú', 'Data Engineer Junior', 4500, 'Junior', 'Python, SQL, PostgreSQL, Docker, AWS, GCP, Linux, Pandas. Experiencia con pipelines de datos.', 'Lima, Híbrido', '2026-08-18')
-ON CONFLICT DO NOTHING;
-
--- ============================================
--- SEED: JOB SKILLS MAPPING
--- ============================================
-
--- Rappi Perú - Practicante Backend Developer
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('java','springboot','rest') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Rappi Perú' AND j.position LIKE '%Backend%' AND s.slug IN ('java','springboot','rest','git','docker','postgres','aws','scrum')
-ON CONFLICT DO NOTHING;
-
--- BCP - Practicante Data Analyst
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('sql','powerbi') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'BCP' AND j.position LIKE '%Data Analyst%' AND s.slug IN ('sql','excel','powerbi','python','pandas','english')
-ON CONFLICT DO NOTHING;
-
--- Culqi - Full Stack Developer Jr
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('react','typescript','nodejs') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Culqi' AND s.slug IN ('react','typescript','nodejs','tailwind','postgres','git','github','docker','aws')
-ON CONFLICT DO NOTHING;
-
--- Interbank - Practicante Data Engineer
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('python','sql','postgres') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Interbank' AND s.slug IN ('python','sql','postgres','docker','gcp','pandas','linux')
-ON CONFLICT DO NOTHING;
-
--- Yape - Frontend Developer Trainee
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('react','nextjs','typescript') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Yape' AND j.position LIKE '%Frontend%' AND s.slug IN ('react','nextjs','typescript','tailwind','git','rest')
-ON CONFLICT DO NOTHING;
-
--- NTT Data - Practicante Machine Learning
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('python','pandas','tensorflow') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'NTT Data' AND s.slug IN ('python','pandas','tensorflow','sql','aws','docker','english')
-ON CONFLICT DO NOTHING;
-
--- Belcorp - Backend Java Semi Senior
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('java','springboot','rest') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Belcorp' AND s.slug IN ('java','springboot','rest','kubernetes','docker','aws','postgres','git','scrum')
-ON CONFLICT DO NOTHING;
-
--- Fintech Startup - Full Stack Node + React
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('nodejs','react','javascript') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Fintech Startup' AND s.slug IN ('nodejs','javascript','typescript','react','mongodb','rest','git','github','docker')
-ON CONFLICT DO NOTHING;
-
--- Globant - Practicante DevOps
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('linux','docker','kubernetes') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Globant' AND j.position LIKE '%DevOps%' AND s.slug IN ('linux','docker','kubernetes','aws','git','github','python')
-ON CONFLICT DO NOTHING;
-
--- Alicorp - Data Analyst Junior
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('sql','powerbi','excel') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Alicorp' AND s.slug IN ('sql','powerbi','excel','python','mysql','english')
-ON CONFLICT DO NOTHING;
-
--- Niubiz - Frontend Developer Jr
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('react','typescript','nextjs') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Niubiz' AND s.slug IN ('react','typescript','nextjs','tailwind','git','github','rest','scrum')
-ON CONFLICT DO NOTHING;
-
--- BBVA Perú - Practicante Data Engineer
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('python','sql','postgres') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'BBVA Perú' AND s.slug IN ('python','sql','postgres','docker','linux','aws','pandas')
-ON CONFLICT DO NOTHING;
-
--- Crehana - Full Stack Developer
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('typescript','react','nodejs') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Crehana' AND s.slug IN ('typescript','react','nodejs','postgres','docker','aws','git','rest','graphql','kubernetes')
-ON CONFLICT DO NOTHING;
-
--- Rimac Seguros - Backend Developer Jr
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('java','springboot','rest') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Rimac Seguros' AND s.slug IN ('java','springboot','rest','sql','postgres','git','docker','scrum')
-ON CONFLICT DO NOTHING;
-
--- Platanitos.com - Practicante Frontend
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('react','javascript') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Platanitos.com' AND s.slug IN ('react','javascript','tailwind','git','nextjs','typescript')
-ON CONFLICT DO NOTHING;
-
--- BCP Digital - Data Analyst Semi Senior
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('sql','python','powerbi') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'BCP Digital' AND s.slug IN ('sql','python','pandas','powerbi','excel','postgres','english')
-ON CONFLICT DO NOTHING;
-
--- Laboratoria - DevOps Engineer Jr
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('linux','docker','kubernetes') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Laboratoria' AND s.slug IN ('linux','docker','kubernetes','aws','git','python','github')
-ON CONFLICT DO NOTHING;
-
--- Konfío Perú - ML Engineer Practicante
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('python','pandas','tensorflow') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Konfío Perú' AND s.slug IN ('python','pandas','tensorflow','sql','docker','statistics','machine_learning')
-ON CONFLICT DO NOTHING;
-
--- Movistar Tech - Backend Python Semi Senior
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('python','fastapi','postgres') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Movistar Tech' AND s.slug IN ('python','fastapi','postgres','docker','aws','git','rest','redis','kubernetes')
-ON CONFLICT DO NOTHING;
-
--- Startup EdTech - Full Stack React + Node Jr
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('react','nextjs','nodejs') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Startup EdTech' AND s.slug IN ('react','nextjs','typescript','nodejs','postgres','tailwind','git','docker')
-ON CONFLICT DO NOTHING;
-
--- Entel Perú - Practicante Ciberseguridad
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('network_security','linux','firewalls') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Entel Perú' AND s.slug IN ('network_security','linux','firewalls','tcp_ip','siem','ethical_hacking')
-ON CONFLICT DO NOTHING;
-
--- Accenture Perú - Data Engineer Junior
-INSERT INTO job_skills (job_id, skill_id, priority)
-SELECT j.id, s.id, CASE WHEN s.slug IN ('python','sql','postgres') THEN 1 ELSE 2 END
-FROM jobs j, skills s WHERE j.company = 'Accenture Perú' AND s.slug IN ('python','sql','postgres','docker','aws','gcp','linux','pandas')
-ON CONFLICT DO NOTHING;
+--
+-- Aquí vivían ~22 ofertas escritas a mano y su mapeo de habilidades.
+-- Se retiraron porque el objetivo de HU-57 es recolectar ofertas reales,
+-- no inyectar ejemplos: un catálogo sembrado da un mercado laboral
+-- inventado, y las recomendaciones de la bolsa laboral que se calculan
+-- sobre él no significan nada.
+--
+-- Para poblar `jobs` y `job_skills`:
+--
+--     python scripts/scrape_jobs.py
+--
+-- o, desde la API, POST /jobs/collect. Ambos recolectan con JobSpy
+-- (Indeed, LinkedIn) y extraen habilidades y requisitos (HU-58).
 
 -- ============================================
 -- SEED: COURSES
@@ -454,4 +305,4 @@ VALUES
     ('course-completed', 'Curso Conquistado', 'Aprueba todos los módulos de un curso activo.', 'courses', 'BookOpen', 'amber', 'completed_course', 1, 200),
     ('level-1-mastered', 'Fundamentos Dominados', 'Domina todas las habilidades clave del Nivel 1 en tu Roadmap.', 'roadmap', 'Trophy', 'orange', 'level_completed', 1, 300),
     ('streak-active', 'Hábito de Hierro', 'Mantén una racha de estudio activa en la plataforma.', 'streak', 'Flame', 'orange', 'streak_days', 3, 100)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;

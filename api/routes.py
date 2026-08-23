@@ -17,7 +17,9 @@ from schemas.auth import UserMeResponse
 from schemas.catalog import (
     CourseResponse,
     JobMatchResponse,
+    JobRecommendationsResponse,
     JobResponse,
+    JobScrapeResponse,
     MarketOverviewResponse,
     RoleTargetResponse,
     SkillResponse,
@@ -46,7 +48,9 @@ from services.course_ingestion_service import CourseIngestionService
 from services.evaluation_service import EvaluationService
 from services.onboarding import ChatbotOnboarding
 from services.user_service import UserService
-from services.vacancy_service import VacancyService
+from services.job_recommendation_service import JobRecommendationService
+from services.job_requirements_service import JobRequirementsService
+from services.job_scraping_service import JobScrapingService
 from services.module_extraction_service import ModuleExtractionService
 from services.module_quiz_service import ModuleQuizService
 from services.course_progress_service import CourseProgressService
@@ -312,26 +316,133 @@ def save_onboarding_target_role(
 
 @router.get(
     "/jobs/search",
-    summary="Buscar ofertas de empleo",
+    summary="Previsualizar ofertas de un término, sin guardarlas (HU-57)",
 )
-async def search_jobs():
-    return await VacancyService.search_jobs()
+def search_jobs(
+    search_term: str = Query(
+        ...,
+        description="Término a buscar, p. ej. 'desarrollador backend'",
+    ),
+    results_wanted: int = Query(10, ge=1, le=100),
+    hours_old: int | None = Query(
+        None,
+        description="Antigüedad máxima en horas. Por defecto, la configurada.",
+    ),
+):
+    """
+    Sirve para verificar qué devuelve un portal antes de recolectar en serio.
+
+    Es síncrona a propósito: JobSpy hace peticiones bloqueantes, y declarada
+    con `def` FastAPI la ejecuta en su pool de hilos en vez de dejar clavado
+    el event loop mientras el portal responde.
+    """
+
+    return {
+        "search_term": search_term,
+        "results": JobScrapingService.scrape_term(
+            search_term,
+            results_wanted=results_wanted,
+            hours_old=hours_old,
+        ),
+    }
 
 
 @router.post(
     "/jobs/collect",
-    summary="Recolectar y guardar ofertas de empleo",
+    response_model=JobScrapeResponse,
+    summary="Recolectar ofertas por scraping y guardarlas (HU-57)",
 )
-async def collect_jobs():
-    return await VacancyService.collect_and_save_jobs()
+def collect_jobs(
+    roles: str | None = Query(
+        None,
+        description=(
+            "Roles objetivo separados por coma (backend, frontend, "
+            "fullstack, data-analyst, data-engineer, ml, devops). "
+            "Si se omite, se recolecta para todos."
+        ),
+    ),
+    results_wanted: int | None = Query(None, ge=1, le=100),
+    hours_old: int | None = Query(None, ge=1),
+    extract_requirements: bool = Query(
+        True,
+        description="Ejecutar también la extracción de HU-58 al terminar.",
+    ),
+):
+    role_ids = (
+        [role.strip() for role in roles.split(",") if role.strip()]
+        if roles
+        else None
+    )
+
+    return JobScrapingService.collect_and_save_jobs(
+        role_ids=role_ids,
+        results_wanted=results_wanted,
+        hours_old=hours_old,
+        extract_requirements=extract_requirements,
+    )
 
 
 @router.post(
-    "/jobs/extract-skills",
-    summary="Extraer habilidades técnicas de las ofertas",
+    "/jobs/extract-requirements",
+    summary="Extraer habilidades, tecnologías y requisitos de las ofertas (HU-58)",
 )
-async def extract_job_skills():
-    return await VacancyService.extract_and_save_job_skills()
+def extract_job_requirements(
+    job_ids: str | None = Query(
+        None,
+        description=(
+            "IDs de ofertas separados por coma. Si se omite, se reanaliza "
+            "todo el catálogo."
+        ),
+    ),
+):
+    parsed_ids = None
+
+    if job_ids:
+        parsed_ids = [
+            int(value.strip())
+            for value in job_ids.split(",")
+            if value.strip().isdigit()
+        ]
+
+    return JobRequirementsService.extract_and_save(job_ids=parsed_ids)
+
+
+@router.get(
+    "/users/job-recommendations",
+    response_model=JobRecommendationsResponse,
+    summary="Bolsa laboral: ofertas alineadas con la ruta del usuario",
+)
+def get_user_job_recommendations(
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    min_match: int = Query(
+        0,
+        ge=0,
+        le=100,
+        description="Descarta las ofertas por debajo de esta afinidad.",
+    ),
+    seniority: str | None = Query(
+        None,
+        description="Practicante | Junior | Semi Senior | Senior | Lead",
+    ),
+    remote_only: bool = Query(False),
+    search: str | None = Query(
+        None,
+        description="Filtra por puesto, empresa o ubicación.",
+    ),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    return JobRecommendationService.get_recommendations(
+        current_user.id,
+        token=credentials.credentials,
+        limit=limit,
+        offset=offset,
+        min_match=min_match,
+        seniority=seniority,
+        remote_only=remote_only,
+        search=search,
+    )
 
 
 # ============================================
@@ -960,4 +1071,4 @@ def sync_user_achievements(
         user_id=current_user.id,
         sync_req=payload,
         token=credentials.credentials,
-    )
+    )

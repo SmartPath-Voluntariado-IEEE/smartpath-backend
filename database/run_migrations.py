@@ -76,7 +76,30 @@ def run():
         cur.execute(seed_sql)
         print("¡Datos semilla cargados exitosamente!")
 
-        # 4. Recargar caché de PostgREST
+        # 4. Ejecutar las migraciones incrementales, en orden de nombre.
+        #    Los archivos de database/migrations/ llevan fecha como prefijo,
+        #    así que el orden alfabético es el orden cronológico. Son
+        #    idempotentes (IF NOT EXISTS), por lo que reejecutarlas no rompe
+        #    una base que ya las tenga aplicadas.
+        migrations_dir = os.path.join(dir_actual, "migrations")
+
+        if os.path.isdir(migrations_dir):
+            migration_files = sorted(
+                name
+                for name in os.listdir(migrations_dir)
+                if name.endswith(".sql")
+            )
+
+            for name in migration_files:
+                print(f"Aplicando migración {name}...")
+                with open(
+                    os.path.join(migrations_dir, name), encoding="utf-8"
+                ) as f:
+                    cur.execute(f.read())
+
+            print(f"¡{len(migration_files)} migraciones aplicadas!")
+
+        # 5. Recargar caché de PostgREST
         print("Recargando caché de PostgREST...")
         cur.execute("NOTIFY pgrst, 'reload schema';")
         print("¡Notificación de recarga de esquema enviada exitosamente!")

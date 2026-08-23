@@ -31,6 +31,14 @@ if (Test-Path "requirements.txt") {
     & .venv\Scripts\pip.exe install fastapi uvicorn supabase python-dotenv
 }
 
+# 3b. JobSpy (HU-57) se instala aparte, con --no-deps.
+# El paquete declara numpy==1.26.3, que no publica wheels para Python 3.13+
+# y hace que pip intente compilar numpy desde fuente (y falle si no hay
+# compilador C). Sus dependencias reales ya vienen en requirements.txt.
+Write-Host "`nInstalando JobSpy (recolector de ofertas laborales)..." -ForegroundColor Yellow
+& .venv\Scripts\pip.exe install python-jobspy==1.1.82 --no-deps
+Write-Host "JobSpy instalado." -ForegroundColor Green
+
 # 4. Crear .env.local si no existe
 Write-Host "`n[3/4] Verificando archivo de variables de entorno..." -ForegroundColor Yellow
 if (!(Test-Path ".env.local")) {
