@@ -1,4 +1,3 @@
-import re
 import statistics
 from typing import Any
 
@@ -43,30 +42,19 @@ SKILL_TIER: dict[str, int] = {
     "kubernetes": 5, "aws": 5, "gcp": 5, "azure": 5, "tensorflow": 5,
 }
 
-def extract_skills_from_text(text: str, skills_catalog: list[dict[str, Any]]) -> list[str]:
-    lower = " " + text.lower() + " "
-    found = set()
-    for s in skills_catalog:
-        aliases = s.get("aliases")
-        names = [s["name"]] + (aliases if aliases else [])
-        for n in names:
-            needle = n.lower()
-            escaped = re.escape(needle)
-            # Asegurar límites de palabra compatibles con caracteres como # o +
-            pattern = rf"(^|[^a-z0-9\+#\.])({escaped})([^a-z0-9\+#]|$)"
-            if re.search(pattern, lower, re.IGNORECASE):
-                found.add(s["slug"])
-                break
-    return list(found)
-
 class AnalysisService:
     @staticmethod
     def market_skill_frequency(jobs: list[dict[str, Any]], skills_catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        # `job["skill_slugs"]` ya viene calculado por CatalogService.get_all_jobs
+        # (join con job_skills, con reserva a extraer del texto solo si una
+        # oferta no tiene ninguna relación guardada). Volver a correr regex
+        # sobre la descripción cruda de cada oferta —como hacía esta función
+        # antes— repite ese trabajo desde cero en cada llamada: con las ~230
+        # ofertas reales que recolecta HU-57, eso solo tomaba unos 4 segundos
+        # de más en cada carga de /users/gap-analysis y /users/roadmap.
         counts = {}
         for j in jobs:
-            text = f"{j.get('position', '')} {j.get('description', '')}"
-            extracted = extract_skills_from_text(text, skills_catalog)
-            for slug in extracted:
+            for slug in j.get("skill_slugs", []):
                 counts[slug] = counts.get(slug, 0) + 1
 
         total = len(jobs)
