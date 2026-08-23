@@ -190,7 +190,6 @@ class CatalogService:
         offset: int = 0,
     ):
         client = get_admin_client()
-
         if skill_slug:
             skill_resp = (
                 client

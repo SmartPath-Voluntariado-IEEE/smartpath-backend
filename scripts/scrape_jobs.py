@@ -35,8 +35,8 @@ sys.path.insert(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 )
 
-from services.job_requirements_service import JobRequirementsService  # noqa: E402
-from services.job_scraping_service import JobScrapingService  # noqa: E402
+from services.job_requirements_service import JobRequirementsService
+from services.job_scraping_service import JobScrapingService
 
 
 def parse_args():

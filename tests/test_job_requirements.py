@@ -12,7 +12,6 @@ from services.job_requirements_service import (
     JobRequirementsService,
 )
 
-
 CATALOG = [
     {"id": 1, "name": "Python", "aliases": ["python"]},
     {"id": 2, "name": "React", "aliases": ["react", "reactjs"]},

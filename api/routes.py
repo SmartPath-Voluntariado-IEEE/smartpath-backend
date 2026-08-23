@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from schemas.achievement import (
@@ -45,15 +45,15 @@ from services.auth_service import AuthService
 from services.catalog_service import CatalogService
 from services.course_collector_service import CourseCollectorService
 from services.course_ingestion_service import CourseIngestionService
+from services.course_progress_service import CourseProgressService
 from services.evaluation_service import EvaluationService
-from services.onboarding import ChatbotOnboarding
-from services.user_service import UserService
 from services.job_recommendation_service import JobRecommendationService
 from services.job_requirements_service import JobRequirementsService
 from services.job_scraping_service import JobScrapingService
 from services.module_extraction_service import ModuleExtractionService
 from services.module_quiz_service import ModuleQuizService
-from services.course_progress_service import CourseProgressService
+from services.onboarding import ChatbotOnboarding
+from services.user_service import UserService
 
 router = APIRouter()
 security = HTTPBearer()

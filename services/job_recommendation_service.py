@@ -20,9 +20,8 @@ Una oferta muy alineada pero con preparación baja no es un mal resultado: es
 justamente hacia donde apunta el roadmap, y se marca como tal.
 """
 
-from services.catalog_service import CatalogService
 from database.database import get_admin_client
-
+from services.catalog_service import CatalogService
 
 # Peso de cada señal en el puntaje final. La alineación pesa más porque el
 # propósito de la pestaña es orientar la ruta, no listar lo más fácil.

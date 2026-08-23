@@ -25,7 +25,6 @@ from jwt import PyJWKClient
 from core.config import settings
 from database.database import supabase_client
 
-
 _JWKS_URL = f"{settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json"
 
 # Un solo cliente para todo el proceso: es el que mantiene la clave pública

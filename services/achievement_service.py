@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+
 from database.database import get_admin_client, get_db_client
 from schemas.achievement import SyncAchievementsRequest
 

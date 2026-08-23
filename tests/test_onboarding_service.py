@@ -1,6 +1,7 @@
 # tests/test_onboarding_service.py
 from unittest.mock import patch
-from services.onboarding import ChatbotOnboarding, STEP_ASK_NAME, STEP_ASK_INTERESTS, STEP_COMPLETED
+
+from services.onboarding import STEP_ASK_NAME, STEP_COMPLETED, ChatbotOnboarding
 
 
 class TestGetCurrentStep:

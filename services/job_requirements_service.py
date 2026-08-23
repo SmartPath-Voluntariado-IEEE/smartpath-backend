@@ -25,7 +25,6 @@ from datetime import datetime
 from database.database import get_admin_client
 from services.skill_matcher import match_skills, normalize_text
 
-
 # Prioridad guardada en job_skills.priority.
 PRIORITY_REQUIRED = 2
 PRIORITY_DESIRABLE = 1
