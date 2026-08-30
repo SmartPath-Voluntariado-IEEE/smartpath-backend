@@ -16,7 +16,8 @@ from __future__ import annotations
 import functools
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 # namespace -> { clave de argumentos: (expira_en, valor) }
 _store: dict[str, dict[Any, tuple[float, Any]]] = {}
