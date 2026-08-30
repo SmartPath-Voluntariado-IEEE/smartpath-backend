@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database.database import get_admin_client  # noqa: E402
+from database.database import get_admin_client
 
 
 def main():
