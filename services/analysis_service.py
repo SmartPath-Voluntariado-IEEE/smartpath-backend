@@ -284,22 +284,33 @@ class AnalysisService:
 
         buckets = {}
 
-        # Combinar missing y partial, conservando de dónde vino cada skill:
-        # una habilidad ausente urge más que una a medias.
+        # Combinar missing, partial y mastered, conservando de dónde vino cada skill:
+        # una habilidad ausente urge más que una a medias, y una dominada se preserva
+        # para mantener el contexto histórico del progreso del usuario.
         all_skills = []
-        for m in gap["missing"]:
+        for m in gap.get("missing", []):
             all_skills.append({
                 "skill_slug": m["skill_slug"],
                 "name": m["name"],
-                "marketFreq": m["marketFreq"],
+                "marketFreq": m.get("marketFreq", 0.0),
                 "isMissing": True,
+                "isMastered": False,
             })
-        for p in gap["partial"]:
+        for p in gap.get("partial", []):
             all_skills.append({
                 "skill_slug": p["skill_slug"],
                 "name": p["name"],
-                "marketFreq": p["marketFreq"],
+                "marketFreq": p.get("marketFreq", 0.0),
                 "isMissing": False,
+                "isMastered": False,
+            })
+        for d in gap.get("mastered", []):
+            all_skills.append({
+                "skill_slug": d["skill_slug"],
+                "name": d["name"],
+                "marketFreq": d.get("marketFreq", 0.0),
+                "isMissing": False,
+                "isMastered": True,
             })
 
         for m in all_skills:
@@ -311,6 +322,18 @@ class AnalysisService:
 
             if not any(x["skill_slug"] == slug for x in buckets[tier]):
                 skill_stats = stats.get(slug)
+                is_mastered = m.get("isMastered", False)
+
+                priority = AnalysisService.score_skill_priority(
+                    slug=slug,
+                    market_freq=m["marketFreq"],
+                    is_missing=m["isMissing"],
+                    skill_stats=skill_stats,
+                    interests=interests,
+                    category=categories.get(slug),
+                )
+                if is_mastered:
+                    priority = -100.0 + priority
 
                 buckets[tier].append({
                     "skill_slug": slug,
@@ -320,16 +343,10 @@ class AnalysisService:
                         slug,
                         skill_stats,
                     ),
-                    "priority": AnalysisService.score_skill_priority(
-                        slug=slug,
-                        market_freq=m["marketFreq"],
-                        is_missing=m["isMissing"],
-                        skill_stats=skill_stats,
-                        interests=interests,
-                        category=categories.get(slug),
-                    ),
+                    "priority": priority,
                     "courseCount": (skill_stats or {}).get("total", 0),
                     "freeCourseCount": (skill_stats or {}).get("free", 0),
+                    "isMastered": is_mastered,
                 })
 
         labels = {
@@ -361,7 +378,11 @@ class AnalysisService:
             skills.sort(key=lambda x: x["priority"], reverse=True)
 
             level_hours = sum(s["estHours"] for s in skills)
-            cumulative_hours += level_hours
+            # Solo las habilidades pendientes requieren horas de estudio futuro
+            pending_hours = sum(
+                s["estHours"] for s in skills if not s.get("isMastered", False)
+            )
+            cumulative_hours += pending_hours
 
             roadmap.append({
                 "level": lvl,
@@ -370,7 +391,7 @@ class AnalysisService:
                 "estHours": level_hours,
                 "cumulativeHours": cumulative_hours,
                 "estimatedWeeks": max(
-                    1,
+                    1 if cumulative_hours > 0 else 0,
                     round(cumulative_hours / max(weekly_hours, 1)),
                 ),
                 "withinTarget": cumulative_hours <= budget_hours,

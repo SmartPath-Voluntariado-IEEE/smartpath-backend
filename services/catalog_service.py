@@ -1,9 +1,16 @@
+from core.cache import invalidate, ttl_cache
 from database.database import get_admin_client
 from services.course_pricing import is_free_course
+
+# El catálogo solo cambia cuando corre una ingesta o un scraping, y esas
+# rutas invalidan la caché explícitamente (ver CatalogService.invalidate_cache).
+# El TTL es la red de seguridad para escrituras hechas fuera del backend.
+CATALOG_TTL_SECONDS = 600
 
 
 class CatalogService:
     @staticmethod
+    @ttl_cache("catalog:skills", CATALOG_TTL_SECONDS)
     def get_all_skills():
         client = get_admin_client()
 
@@ -34,6 +41,7 @@ class CatalogService:
         return list(found)
 
     @staticmethod
+    @ttl_cache("catalog:jobs", CATALOG_TTL_SECONDS)
     def get_all_jobs():
         client = get_admin_client()
 
@@ -78,6 +86,7 @@ class CatalogService:
         return jobs
 
     @staticmethod
+    @ttl_cache("catalog:market", CATALOG_TTL_SECONDS)
     def get_market_overview():
         """Aggregate market data: skill demand, salary ranges, top companies."""
 
@@ -183,6 +192,7 @@ class CatalogService:
         return matches
 
     @staticmethod
+    @ttl_cache("catalog:courses", CATALOG_TTL_SECONDS)
     def get_all_courses(
         skill_slug: str | None = None,
         limit: int | None = None,
@@ -279,6 +289,7 @@ class CatalogService:
         return courses
 
     @staticmethod
+    @ttl_cache("catalog:role_skills", CATALOG_TTL_SECONDS)
     def get_role_skills(role_id: str):
         client = get_admin_client()
 
@@ -314,6 +325,7 @@ class CatalogService:
         return role_skills
 
     @staticmethod
+    @ttl_cache("catalog:roles", CATALOG_TTL_SECONDS)
     def get_all_role_targets():
         client = get_admin_client()
 
@@ -342,3 +354,22 @@ class CatalogService:
                 })
 
         return roles
+
+    CACHE_NAMESPACES = (
+        "catalog:skills",
+        "catalog:jobs",
+        "catalog:market",
+        "catalog:courses",
+        "catalog:role_skills",
+        "catalog:roles",
+    )
+
+    @staticmethod
+    def invalidate_cache() -> None:
+        """
+        Descarta el catálogo cacheado. Debe llamarse tras cualquier escritura
+        del backend sobre cursos, ofertas o habilidades para que la siguiente
+        lectura vea los datos nuevos sin esperar al TTL.
+        """
+
+        invalidate(*CatalogService.CACHE_NAMESPACES)

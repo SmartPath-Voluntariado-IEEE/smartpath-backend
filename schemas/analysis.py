@@ -46,6 +46,7 @@ class RoadmapSkill(BaseModel):
     priority: float = 0.0
     courseCount: int = 0
     freeCourseCount: int = 0
+    isMastered: bool = False
 
 class RoadmapLevel(BaseModel):
     level: int

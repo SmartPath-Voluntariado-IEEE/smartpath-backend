@@ -4,10 +4,10 @@ from services.analysis_service import (
 )
 
 
-def build_gap(missing=None, partial=None):
+def build_gap(missing=None, partial=None, mastered=None):
     return {
         "target_role": {"id": "backend", "label": "Backend"},
-        "mastered": [],
+        "mastered": mastered or [],
         "partial": partial or [],
         "missing": missing or [],
         "coverage": 0.0,
@@ -145,6 +145,47 @@ def test_el_roadmap_informa_el_plazo_pero_no_recorta():
     assert roadmap[-1]["cumulativeHours"] > roadmap[0]["cumulativeHours"]
 
 
+def test_habilidades_dominadas_permanecen_en_el_roadmap():
+    # HU-69: Habilidad dominada debe mantenerse en el nivel correspondiente
+    gap = build_gap(
+        missing=[{"skill_slug": "docker", "name": "Docker", "marketFreq": 0.3}],
+        mastered=[{"skill_slug": "git", "name": "Git", "marketFreq": 0.5, "level": 5}],
+    )
+
+    roadmap = AnalysisService.generate_roadmap(gap)
+
+    levels = {lvl["level"]: lvl for lvl in roadmap}
+    assert 1 in levels
+    assert 4 in levels
+
+    git_skill = next((s for s in levels[1]["skills"] if s["skill_slug"] == "git"), None)
+    assert git_skill is not None
+    assert git_skill["isMastered"] is True
+
+
+def test_habilidades_dominadas_no_inflan_horas_pendientes():
+    # Las horas acumuladas solo deben contar el esfuerzo restante
+    gap = build_gap(
+        missing=[{"skill_slug": "docker", "name": "Docker", "marketFreq": 0.3}],
+        mastered=[{"skill_slug": "git", "name": "Git", "marketFreq": 0.5, "level": 5}],
+    )
+
+    roadmap = AnalysisService.generate_roadmap(
+        gap,
+        courses_catalog=[
+            course("git", hours=10),
+            course("docker", hours=10),
+        ],
+        profile={"weekly_hours": 10, "target_months": 3},
+    )
+
+    levels = {lvl["level"]: lvl for lvl in roadmap}
+    # Nivel 1 tiene git (dominada), cumulativeHours debe ser 0
+    assert levels[1]["cumulativeHours"] == 0
+    # Nivel 4 tiene docker (pendiente 20h), cumulativeHours debe ser 20
+    assert levels[4]["cumulativeHours"] == 20
+
+
 def test_ingles_bajo_prioriza_cursos_en_espanol():
     catalog = [
         course("python", hours=10, language="English"),
@@ -184,3 +225,4 @@ def test_sin_dato_de_ingles_no_se_penaliza_ningun_idioma():
 
     # Ambos siguen presentes y el idioma no altera el orden.
     assert len(recs) == 2
+
