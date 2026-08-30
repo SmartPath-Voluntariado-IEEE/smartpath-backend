@@ -53,15 +53,54 @@ class UserService:
 
     @staticmethod
     def get_profile(user_id: str, token: str | None = None):
+        # El perfil y sus habilidades se traen en una sola consulta anidada
+        # (antes eran dos viajes de red por cada llamada, y el perfil se pide
+        # en casi todos los endpoints autenticados).
         client = get_db_client(token)
-        response = client.table("users").select("*").eq("id", user_id).execute()
-        if response.data:
-            profile = response.data[0]
-            if profile.get("target_months") is None:
-                profile["target_months"] = 6
+
+        try:
+            response = (
+                client
+                .table("users")
+                .select("*, user_skills(level, skills(slug))")
+                .eq("id", user_id)
+                .execute()
+            )
+            embedded = True
+        except Exception:
+            # Si PostgREST no resuelve la relación anidada, se vuelve al
+            # camino clásico de dos consultas para no romper el perfil.
+            response = (
+                client
+                .table("users")
+                .select("*")
+                .eq("id", user_id)
+                .execute()
+            )
+            embedded = False
+
+        if not response.data:
+            return None
+
+        profile = response.data[0]
+
+        if profile.get("target_months") is None:
+            profile["target_months"] = 6
+
+        if embedded:
+            raw_skills = profile.pop("user_skills", None) or []
+            profile["skills"] = [
+                {
+                    "skill_slug": item["skills"]["slug"],
+                    "level": item.get("level"),
+                }
+                for item in raw_skills
+                if item.get("skills") and item["skills"].get("slug")
+            ]
+        else:
             profile["skills"] = UserService.get_user_skills(user_id, token=token)
-            return profile
-        return None
+
+        return profile
 
     @staticmethod
     def upsert_profile(user_id: str, email: str, default_name: str, profile_data: UserProfileUpdate, token: str | None = None):

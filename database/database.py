@@ -1,4 +1,7 @@
 
+import threading
+from collections import OrderedDict
+
 from supabase import Client, create_client
 
 from core.config import settings
@@ -51,6 +54,25 @@ def get_admin_client() -> Client:
     return supabase_admin_client
 
 
+# Cada create_client() abre un pool HTTP nuevo, así que la primera consulta
+# paga handshake TLS. Antes se creaba un cliente por llamada a get_db_client(),
+# es decir varias veces por petición. Aquí se reutiliza el cliente por token,
+# conservando el aislamiento de RLS (cada token mantiene el suyo).
+_TOKEN_CLIENT_LIMIT = 128
+
+_token_clients: "OrderedDict[str, Client]" = OrderedDict()
+_token_clients_lock = threading.Lock()
+
+
+def _build_token_client(token: str) -> Client:
+    client = create_client(
+        settings.SUPABASE_URL,
+        settings.SUPABASE_ANON_KEY,
+    )
+    client.postgrest.auth(token)
+    return client
+
+
 def get_db_client(token: str | None = None) -> Client:
     """
     Retorna un cliente que respeta la sesión y las políticas RLS.
@@ -59,12 +81,36 @@ def get_db_client(token: str | None = None) -> Client:
     get_admin_client() únicamente para procesos internos del backend.
     """
 
-    if token:
-        client = create_client(
-            settings.SUPABASE_URL,
-            settings.SUPABASE_ANON_KEY,
-        )
-        client.postgrest.auth(token)
-        return client
+    if not token:
+        return supabase_client
 
-    return supabase_client
+    with _token_clients_lock:
+        client = _token_clients.get(token)
+
+        if client is not None:
+            # Marca el token como usado recientemente (política LRU).
+            _token_clients.move_to_end(token)
+            return client
+
+    client = _build_token_client(token)
+
+    with _token_clients_lock:
+        existing = _token_clients.get(token)
+
+        if existing is not None:
+            _token_clients.move_to_end(token)
+            return existing
+
+        _token_clients[token] = client
+
+        while len(_token_clients) > _TOKEN_CLIENT_LIMIT:
+            _token_clients.popitem(last=False)
+
+    return client
+
+
+def clear_token_clients() -> None:
+    """Descarta los clientes autenticados cacheados (usado en pruebas)."""
+
+    with _token_clients_lock:
+        _token_clients.clear()

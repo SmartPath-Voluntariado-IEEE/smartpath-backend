@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from api.routes import router as api_router
 from core.config import settings
@@ -9,6 +10,10 @@ app = FastAPI(
     description="Estructura modular para verificar autenticación de usuarios desde un frontend independiente",
     version="1.0.0"
 )
+
+# El catálogo de cursos y ofertas viaja como JSON de cientos de KB; comprimirlo
+# recorta la transferencia sin tocar los endpoints.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.add_middleware(
     CORSMiddleware,

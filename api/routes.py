@@ -374,12 +374,18 @@ def collect_jobs(
         else None
     )
 
-    return JobScrapingService.collect_and_save_jobs(
+    result = JobScrapingService.collect_and_save_jobs(
         role_ids=role_ids,
         results_wanted=results_wanted,
         hours_old=hours_old,
         extract_requirements=extract_requirements,
     )
+
+    # El catálogo queda cacheado en memoria: sin esto, las ofertas recién
+    # guardadas no aparecerían hasta que venciera el TTL.
+    CatalogService.invalidate_cache()
+
+    return result
 
 
 @router.post(
@@ -404,7 +410,11 @@ def extract_job_requirements(
             if value.strip().isdigit()
         ]
 
-    return JobRequirementsService.extract_and_save(job_ids=parsed_ids)
+    result = JobRequirementsService.extract_and_save(job_ids=parsed_ids)
+
+    CatalogService.invalidate_cache()
+
+    return result
 
 
 @router.get(
@@ -560,13 +570,17 @@ def ingest_courses(
     ),
     _current_user=Depends(get_current_user),
 ):
-    return CourseIngestionService.ingest_courses(
+    result = CourseIngestionService.ingest_courses(
         search_query=query,
         max_items=max_items,
         language=language,
         skill_slug=skill_slug,
         free_only=free_only,
     )
+
+    CatalogService.invalidate_cache()
+
+    return result
 @router.get(
     "/catalog/courses",
     response_model=list[CourseResponse],
@@ -721,6 +735,18 @@ def get_user_gap_analysis(
         token=credentials.credentials,
     )
 
+    return _build_gap_analysis(profile)
+
+
+def _build_gap_analysis(profile: dict | None) -> dict:
+    """
+    Calcula la brecha de habilidades a partir de un perfil ya cargado.
+
+    Se separó del endpoint porque /users/roadmap y /dashboard/course-progress
+    también la necesitan: antes reutilizaban el endpoint y eso volvía a pedir
+    el perfil a la base de datos una segunda vez en la misma petición.
+    """
+
     if not profile:
         profile = {
             "target_role_id": "fullstack",
@@ -787,23 +813,15 @@ def get_user_roadmap(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user=Depends(get_current_user),
 ):
-    gap = get_user_gap_analysis(
-        credentials,
-        current_user,
-    )
-
-    gap_dict = (
-        gap
-        if isinstance(gap, dict)
-        else gap.model_dump()
-    )
-
     # El roadmap se refina con el perfil (disponibilidad, plazo, intereses) y
-    # con la oferta real de cursos, no solo con la brecha de habilidades.
+    # con la oferta real de cursos, no solo con la brecha de habilidades. El
+    # perfil se lee una sola vez y se comparte con el cálculo de la brecha.
     profile = UserService.get_profile(
         current_user.id,
         token=credentials.credentials,
     )
+
+    gap_dict = _build_gap_analysis(profile)
 
     return AnalysisService.generate_roadmap(
         gap_dict,
@@ -993,10 +1011,11 @@ def get_dashboard_course_progress(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user=Depends(get_current_user),
 ):
-    roadmap_gap = get_user_gap_analysis(credentials, current_user)
-    roadmap = AnalysisService.generate_roadmap(
-        roadmap_gap if isinstance(roadmap_gap, dict) else roadmap_gap.model_dump()
+    profile = UserService.get_profile(
+        current_user.id,
+        token=credentials.credentials,
     )
+    roadmap = AnalysisService.generate_roadmap(_build_gap_analysis(profile))
     all_skills = [s for level in roadmap for s in level["skills"]]
 
     return CourseProgressService.get_dashboard_summary(
