@@ -220,3 +220,77 @@ class CourseProgressService:
             })
 
         return summary
+
+    @staticmethod
+    def get_skill_effective_progress(
+        user_id: str, skill_slug: str, token: str
+    ) -> dict:
+        """
+        Progreso efectivo de una sola skill: combina el nivel declarado en
+        el perfil (user_skills, escala 1-5 -> 20% cada punto) con el avance
+        real de módulos del curso vinculado a esa skill.
+
+        Misma fórmula que usa get_dashboard_summary, pero para una sola
+        skill (útil para el endpoint /users/skill-progress).
+        """
+        supabase = get_db_client(token)
+
+        user_skill_result = (
+            supabase.table("user_skills")
+            .select("level, skills(slug)")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        declared_level = 0
+        for item in user_skill_result.data or []:
+            skill_info = item.get("skills")
+            if skill_info and skill_info.get("slug") == skill_slug:
+                declared_level = item.get("level", 0)
+                break
+
+        base_percent = min(max(declared_level * 20, 0), 100)
+
+        selection = (
+            supabase.table("user_skill_courses")
+            .select("course_id")
+            .eq("user_id", user_id)
+            .eq("skill_slug", skill_slug)
+            .limit(1)
+            .execute()
+        )
+
+        if not selection.data:
+            return {
+                "percent": round(base_percent, 2),
+                "course_linked": False,
+                "modules_completed": 0,
+                "modules_total": 0,
+            }
+
+        course_id = selection.data[0]["course_id"]
+        module_progress = CourseProgressService.get_course_progress(
+            user_id, course_id, token
+        )
+
+        total = module_progress["total"]
+        completed = module_progress["completed"]
+
+        if total == 0:
+            return {
+                "percent": round(base_percent, 2),
+                "course_linked": True,
+                "modules_completed": 0,
+                "modules_total": 0,
+            }
+
+        remaining = 100 - base_percent
+        bonus = (completed / total) * remaining
+        final_percent = min(100, base_percent + bonus)
+
+        return {
+            "percent": round(final_percent, 2),
+            "course_linked": True,
+            "modules_completed": completed,
+            "modules_total": total,
+        }

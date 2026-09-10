@@ -1091,3 +1091,37 @@ def sync_user_achievements(
         sync_req=payload,
         token=credentials.credentials,
     )
+@router.get(
+    "/users/skill-progress",
+    summary="Progreso efectivo por habilidad (nivel declarado + avance de módulos)",
+)
+def get_user_skill_progress(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user=Depends(get_current_user),
+):
+    roadmap = get_user_roadmap(credentials, current_user)
+    all_slugs = {
+        skill["skill_slug"]
+        for level in roadmap
+        for skill in level["skills"]
+    }
+
+    result = {}
+    for slug in all_slugs:
+        result[slug] = CourseProgressService.get_skill_effective_progress(
+            user_id=current_user.id,
+            skill_slug=slug,
+            token=credentials.credentials,
+        )
+
+    return result
+
+@router.get(
+    "/courses/{course_id}",
+    summary="Obtiene el detalle de un curso específico",
+)
+def get_course_detail(course_id: int):
+    course = CatalogService.get_course_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Curso no encontrado.")
+    return course

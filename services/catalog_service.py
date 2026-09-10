@@ -373,3 +373,14 @@ class CatalogService:
         """
 
         invalidate(*CatalogService.CACHE_NAMESPACES)
+    @staticmethod
+    def get_course_by_id(course_id: int) -> dict | None:
+        client = get_admin_client()
+        response = (
+            client.table("courses")
+            .select("*")
+            .eq("id", course_id)
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
