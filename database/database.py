@@ -6,16 +6,45 @@ from supabase import Client, create_client
 
 from core.config import settings
 
+from postgrest.base_request_builder import RequestConfig
+
 if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
     raise ValueError(
         "Faltan SUPABASE_URL o SUPABASE_ANON_KEY en el archivo .env"
     )
 
 
+def _patch_postgrest_retries():
+    """Habilita reintentos transparentes en PostgREST ante errores 502/504 Gateway Timeout de Supabase."""
+    def _extended_should_retry(self, response, attempt_count: int) -> bool:
+        if not self.retry_enabled or attempt_count >= 3:
+            return False
+        if self.http_method not in ("GET", "HEAD", "HTTP"):
+            return False
+        return response.status_code in (502, 503, 504, 520, 521, 522, 524)
+
+    RequestConfig.should_retry = _extended_should_retry
+
+_patch_postgrest_retries()
+
+
+def _configure_client_retries(client: Client) -> Client:
+    """Configura reintentos en el pool HTTP de PostgREST para evitar caídas por desconexiones o sockets inactivos en Windows."""
+    try:
+        pool = getattr(client.postgrest.session._transport, "_pool", None)
+        if pool is not None and hasattr(pool, "_retries"):
+            pool._retries = 3
+    except Exception:
+        pass
+    return client
+
+
 # Cliente normal: utiliza la clave anon y respeta las políticas RLS.
-supabase_client: Client = create_client(
-    settings.SUPABASE_URL,
-    settings.SUPABASE_ANON_KEY,
+supabase_client: Client = _configure_client_retries(
+    create_client(
+        settings.SUPABASE_URL,
+        settings.SUPABASE_ANON_KEY,
+    )
 )
 
 
@@ -30,9 +59,11 @@ supabase_backend_key = (
 
 # Se crea solo cuando existe alguna clave administrativa.
 supabase_admin_client: Client | None = (
-    create_client(
-        settings.SUPABASE_URL,
-        supabase_backend_key,
+    _configure_client_retries(
+        create_client(
+            settings.SUPABASE_URL,
+            supabase_backend_key,
+        )
     )
     if supabase_backend_key
     else None
@@ -65,9 +96,11 @@ _token_clients_lock = threading.Lock()
 
 
 def _build_token_client(token: str) -> Client:
-    client = create_client(
-        settings.SUPABASE_URL,
-        settings.SUPABASE_ANON_KEY,
+    client = _configure_client_retries(
+        create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_ANON_KEY,
+        )
     )
     client.postgrest.auth(token)
     return client

@@ -603,11 +603,15 @@ def get_catalog_courses(
         description="Cantidad de cursos a omitir para paginar",
     ),
 ):
-    return CatalogService.get_all_courses(
-        skill_slug=skill,
-        limit=limit,
-        offset=offset,
-    )
+    try:
+        return CatalogService.get_all_courses(
+            skill_slug=skill,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as error:
+        print(f"Aviso al obtener cursos del catálogo: {error}")
+        return []
 
 
 @router.get(
