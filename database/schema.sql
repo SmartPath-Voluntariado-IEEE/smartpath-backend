@@ -23,6 +23,7 @@ CREATE TABLE users (
     experience_level VARCHAR(50),
     role_experience TEXT,
     weekly_hours INTEGER,
+    target_months INTEGER DEFAULT 6,
     professional_goal VARCHAR(100),
     target_role_id VARCHAR(30) REFERENCES role_targets(id),
     interests TEXT[],

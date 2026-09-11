@@ -1,6 +1,9 @@
+import logging
 
 from database.database import get_db_client
 from schemas.user import UserProfileUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -135,10 +138,16 @@ class UserService:
                 data["english_level"] = str(data["english_level"])[:30]
 
             target_months_val = data.get("target_months", 6)
+            if target_months_val is None:
+                target_months_val = 6
+
             try:
                 response = client.table("users").upsert(data).execute()
             except Exception as upsert_err:
-                print(f"⚠️ Aviso al hacer upsert con target_months: {upsert_err}. Reintentando compatibilidad...")
+                logger.info(
+                    "Aviso al hacer upsert con target_months: %s. Reintentando compatibilidad...",
+                    upsert_err,
+                )
                 if "target_months" in data:
                     data.pop("target_months", None)
                     response = client.table("users").upsert(data).execute()
@@ -156,5 +165,5 @@ class UserService:
                 return profile
             return None
         except Exception as e:
-            print(f"Error crítico en UserService.upsert_profile: {e}")
+            logger.error("Error crítico en UserService.upsert_profile: %s", e, exc_info=True)
             raise e

@@ -12,10 +12,23 @@ if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
     )
 
 
+def _configure_client_retries(client: Client) -> Client:
+    """Configura reintentos en el pool HTTP de PostgREST para evitar caídas por desconexiones o sockets inactivos en Windows."""
+    try:
+        pool = getattr(client.postgrest.session._transport, "_pool", None)
+        if pool is not None and hasattr(pool, "_retries"):
+            pool._retries = 3
+    except Exception:
+        pass
+    return client
+
+
 # Cliente normal: utiliza la clave anon y respeta las políticas RLS.
-supabase_client: Client = create_client(
-    settings.SUPABASE_URL,
-    settings.SUPABASE_ANON_KEY,
+supabase_client: Client = _configure_client_retries(
+    create_client(
+        settings.SUPABASE_URL,
+        settings.SUPABASE_ANON_KEY,
+    )
 )
 
 
@@ -30,9 +43,11 @@ supabase_backend_key = (
 
 # Se crea solo cuando existe alguna clave administrativa.
 supabase_admin_client: Client | None = (
-    create_client(
-        settings.SUPABASE_URL,
-        supabase_backend_key,
+    _configure_client_retries(
+        create_client(
+            settings.SUPABASE_URL,
+            supabase_backend_key,
+        )
     )
     if supabase_backend_key
     else None
@@ -65,9 +80,11 @@ _token_clients_lock = threading.Lock()
 
 
 def _build_token_client(token: str) -> Client:
-    client = create_client(
-        settings.SUPABASE_URL,
-        settings.SUPABASE_ANON_KEY,
+    client = _configure_client_retries(
+        create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_ANON_KEY,
+        )
     )
     client.postgrest.auth(token)
     return client

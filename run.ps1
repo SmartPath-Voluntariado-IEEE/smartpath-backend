@@ -21,4 +21,6 @@ if (Test-Path ".env.local") {
 
 # 3. Lanzar servidor
 Write-Host "Levantando Uvicorn..." -ForegroundColor Yellow
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
 & ".\.venv\Scripts\python.exe" -m uvicorn main:app --reload
