@@ -6,10 +6,26 @@ from supabase import Client, create_client
 
 from core.config import settings
 
+from postgrest.base_request_builder import RequestConfig
+
 if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
     raise ValueError(
         "Faltan SUPABASE_URL o SUPABASE_ANON_KEY en el archivo .env"
     )
+
+
+def _patch_postgrest_retries():
+    """Habilita reintentos transparentes en PostgREST ante errores 502/504 Gateway Timeout de Supabase."""
+    def _extended_should_retry(self, response, attempt_count: int) -> bool:
+        if not self.retry_enabled or attempt_count >= 3:
+            return False
+        if self.http_method not in ("GET", "HEAD", "HTTP"):
+            return False
+        return response.status_code in (502, 503, 504, 520, 521, 522, 524)
+
+    RequestConfig.should_retry = _extended_should_retry
+
+_patch_postgrest_retries()
 
 
 def _configure_client_retries(client: Client) -> Client:

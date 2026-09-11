@@ -1,6 +1,11 @@
+import logging
+import time
+
 from core.cache import invalidate, ttl_cache
 from database.database import get_admin_client
 from services.course_pricing import is_free_course
+
+logger = logging.getLogger(__name__)
 
 # El catálogo solo cambia cuando corre una ingesta o un scraping, y esas
 # rutas invalidan la caché explícitamente (ver CatalogService.invalidate_cache).
@@ -200,18 +205,28 @@ class CatalogService:
     ):
         client = get_admin_client()
         if skill_slug:
-            skill_resp = (
-                client
-                .table("skills")
-                .select("id")
-                .eq("slug", skill_slug)
-                .execute()
-            )
+            # Intentar resolver el skill_id desde el catálogo en memoria para ahorrar un viaje de red
+            skill_id = None
+            try:
+                cached_skills = CatalogService.get_all_skills()
+                for sk in cached_skills:
+                    if sk.get("slug") == skill_slug:
+                        skill_id = sk.get("id")
+                        break
+            except Exception:
+                skill_id = None
 
-            if not skill_resp.data:
-                return []
-
-            skill_id = skill_resp.data[0]["id"]
+            if skill_id is None:
+                skill_resp = (
+                    client
+                    .table("skills")
+                    .select("id")
+                    .eq("slug", skill_slug)
+                    .execute()
+                )
+                if not skill_resp.data:
+                    return []
+                skill_id = skill_resp.data[0]["id"]
 
             course_skill_response = (
                 client
@@ -246,7 +261,23 @@ class CatalogService:
         if limit is not None:
             query = query.range(offset, offset + limit - 1)
 
-        response = query.execute()
+        try:
+            response = query.execute()
+        except Exception as query_err:
+            logger.warning(
+                "Fallo transitorio en consulta de catálogo de cursos (%s). Reintentando...",
+                query_err,
+            )
+            time.sleep(0.5)
+            try:
+                response = query.execute()
+            except Exception as final_err:
+                logger.error(
+                    "Error persistente al consultar catálogo de cursos: %s",
+                    final_err,
+                    exc_info=True,
+                )
+                return []
 
         courses = []
 
