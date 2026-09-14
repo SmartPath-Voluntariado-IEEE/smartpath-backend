@@ -9,10 +9,10 @@ class CourseProgressService:
         user_id: str, skill_slug: str, course_id: int, token: str
     ) -> dict:
         invalidate("user:progress_summary")
-        supabase = get_db_client(token)
+        admin = get_admin_client()
 
         existing = (
-            supabase.table("user_skill_courses")
+            admin.table("user_skill_courses")
             .select("id")
             .eq("user_id", user_id)
             .eq("skill_slug", skill_slug)
@@ -31,11 +31,11 @@ class CourseProgressService:
             CourseProgressService._reset_progress_for_skill(
                 user_id, skill_slug, token
             )
-            supabase.table("user_skill_courses").update(row).eq(
+            admin.table("user_skill_courses").update(row).eq(
                 "user_id", user_id
             ).eq("skill_slug", skill_slug).execute()
         else:
-            supabase.table("user_skill_courses").insert(row).execute()
+            admin.table("user_skill_courses").insert(row).execute()
 
         return row
 
@@ -44,8 +44,8 @@ class CourseProgressService:
         invalidate("user:progress_summary")
         CourseProgressService._reset_progress_for_skill(user_id, skill_slug, token)
 
-        supabase = get_db_client(token)
-        supabase.table("user_skill_courses").delete().eq(
+        admin = get_admin_client()
+        admin.table("user_skill_courses").delete().eq(
             "user_id", user_id
         ).eq("skill_slug", skill_slug).execute()
 
@@ -79,17 +79,16 @@ class CourseProgressService:
         if not module_ids:
             return
 
-        supabase = get_db_client(token)
-        supabase.table("user_module_completion").delete().eq(
+        admin = get_admin_client()
+        admin.table("user_module_completion").delete().eq(
             "user_id", user_id
         ).in_("module_id", module_ids).execute()
 
     @staticmethod
-    def get_course_progress(user_id: str, course_id: int, token: str) -> dict:
+    def get_course_progress(user_id: str, course_id: int, token: str = "") -> dict:
         admin = get_admin_client()
-        supabase = get_db_client(token)
         user_skills_result = (
-            supabase.table("user_skills")
+            admin.table("user_skills")
             .select("level, skills(slug)")
             .eq("user_id", user_id)
             .execute()
@@ -115,9 +114,8 @@ class CourseProgressService:
         if total == 0:
             return {"completed": 0, "total": 0, "percentage": 0.0}
 
-        supabase = get_db_client(token)
         completed_result = (
-            supabase.table("user_module_completion")
+            admin.table("user_module_completion")
             .select("module_id")
             .eq("user_id", user_id)
             .eq("passed", True)
@@ -138,15 +136,14 @@ class CourseProgressService:
     def get_dashboard_summary(
         user_id: str,
         roadmap_skills: list[dict],
-        token: str,
+        token: str = "",
     ) -> list[dict]:
         """roadmap_skills: [{"skill_slug": "python", ...}, ...] de tu roadmap actual."""
-        supabase = get_db_client(token)
         admin = get_admin_client()
 
         # 1. Traer niveles declarados de user_skills (1 viaje)
         user_skills_result = (
-            supabase.table("user_skills")
+            admin.table("user_skills")
             .select("level, skills(slug)")
             .eq("user_id", user_id)
             .execute()
@@ -160,7 +157,7 @@ class CourseProgressService:
 
         # 2. Traer todos los cursos vinculados del usuario de una sola vez (1 viaje)
         user_courses_resp = (
-            supabase.table("user_skill_courses")
+            admin.table("user_skill_courses")
             .select("skill_slug, course_id")
             .eq("user_id", user_id)
             .execute()
@@ -200,7 +197,7 @@ class CourseProgressService:
         passed_module_ids = set()
         if all_module_ids:
             completed_resp = (
-                supabase.table("user_module_completion")
+                admin.table("user_module_completion")
                 .select("module_id")
                 .eq("user_id", user_id)
                 .eq("passed", True)
@@ -267,10 +264,10 @@ class CourseProgressService:
         Misma fórmula que usa get_dashboard_summary, pero para una sola
         skill (útil para el endpoint /users/skill-progress).
         """
-        supabase = get_db_client(token)
+        admin = get_admin_client()
 
         user_skill_result = (
-            supabase.table("user_skills")
+            admin.table("user_skills")
             .select("level, skills(slug)")
             .eq("user_id", user_id)
             .execute()
@@ -286,7 +283,7 @@ class CourseProgressService:
         base_percent = min(max(declared_level * 20, 0), 100)
 
         selection = (
-            supabase.table("user_skill_courses")
+            admin.table("user_skill_courses")
             .select("course_id")
             .eq("user_id", user_id)
             .eq("skill_slug", skill_slug)
