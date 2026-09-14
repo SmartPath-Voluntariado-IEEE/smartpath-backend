@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+from core.cache import invalidate
 from database.database import get_admin_client, get_db_client
 from services.gemini_client import generate_quiz_for_module
 
@@ -149,6 +150,7 @@ class ModuleQuizService:
                 ).eq("module_id", module_id).execute()
             else:
                 supabase.table("user_module_completion").insert(row).execute()
+            invalidate("user:progress_summary")
         except Exception as db_err:
             print(f"⚠️ [QUIZ SUBMIT] No se pudo guardar progreso en user_module_completion: {db_err}")
 

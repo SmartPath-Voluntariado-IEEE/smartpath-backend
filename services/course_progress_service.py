@@ -1,3 +1,4 @@
+from core.cache import invalidate, ttl_cache
 from database.database import get_admin_client, get_db_client
 
 
@@ -7,6 +8,7 @@ class CourseProgressService:
     def select_course_for_skill(
         user_id: str, skill_slug: str, course_id: int, token: str
     ) -> dict:
+        invalidate("user:progress_summary")
         supabase = get_db_client(token)
 
         existing = (
@@ -39,6 +41,7 @@ class CourseProgressService:
 
     @staticmethod
     def unlink_course_from_skill(user_id: str, skill_slug: str, token: str):
+        invalidate("user:progress_summary")
         CourseProgressService._reset_progress_for_skill(user_id, skill_slug, token)
 
         supabase = get_db_client(token)
@@ -131,6 +134,7 @@ class CourseProgressService:
         }
 
     @staticmethod
+    @ttl_cache("user:progress_summary", ttl_seconds=60)
     def get_dashboard_summary(
         user_id: str,
         roadmap_skills: list[dict],
@@ -140,6 +144,7 @@ class CourseProgressService:
         supabase = get_db_client(token)
         admin = get_admin_client()
 
+        # 1. Traer niveles declarados de user_skills (1 viaje)
         user_skills_result = (
             supabase.table("user_skills")
             .select("level, skills(slug)")
@@ -148,26 +153,70 @@ class CourseProgressService:
         )
 
         user_skill_levels = {}
-
         for item in user_skills_result.data or []:
             skill_info = item.get("skills")
             if skill_info and skill_info.get("slug"):
                 user_skill_levels[skill_info["slug"]] = item.get("level", 0)
 
+        # 2. Traer todos los cursos vinculados del usuario de una sola vez (1 viaje)
+        user_courses_resp = (
+            supabase.table("user_skill_courses")
+            .select("skill_slug, course_id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        user_courses_by_slug = {
+            row["skill_slug"]: row["course_id"]
+            for row in (user_courses_resp.data or [])
+            if row.get("skill_slug")
+        }
+
+        course_ids = list({cid for cid in user_courses_by_slug.values() if cid})
+        courses_by_id = {}
+        modules_by_course: dict[int, list[str]] = {cid: [] for cid in course_ids}
+        all_module_ids = []
+
+        # 3. Traer cursos y módulos en bloque (máx 2 viajes)
+        if course_ids:
+            courses_resp = (
+                admin.table("courses")
+                .select("id, title, url")
+                .in_("id", course_ids)
+                .execute()
+            )
+            courses_by_id = {c["id"]: c for c in (courses_resp.data or [])}
+
+            modules_resp = (
+                admin.table("course_modules")
+                .select("id, course_id")
+                .in_("course_id", course_ids)
+                .execute()
+            )
+            for m in (modules_resp.data or []):
+                modules_by_course.setdefault(m["course_id"], []).append(m["id"])
+                all_module_ids.append(m["id"])
+
+        # 4. Traer módulos completados por el usuario en bloque (1 viaje)
+        passed_module_ids = set()
+        if all_module_ids:
+            completed_resp = (
+                supabase.table("user_module_completion")
+                .select("module_id")
+                .eq("user_id", user_id)
+                .eq("passed", True)
+                .in_("module_id", all_module_ids)
+                .execute()
+            )
+            passed_module_ids = {
+                r["module_id"] for r in (completed_resp.data or [])
+            }
+
         summary = []
         for skill in roadmap_skills:
             slug = skill["skill_slug"]
+            course_id = user_courses_by_slug.get(slug)
 
-            selection = (
-                supabase.table("user_skill_courses")
-                .select("course_id")
-                .eq("user_id", user_id)
-                .eq("skill_slug", slug)
-                .limit(1)
-                .execute()
-            )
-
-            if not selection.data:
+            if not course_id:
                 summary.append({
                     "skill_slug": slug,
                     "course_id": None,
@@ -177,46 +226,31 @@ class CourseProgressService:
                 })
                 continue
 
-            course_id = selection.data[0]["course_id"]
-
-            
-            course_info = (
-                admin.table("courses")
-                .select("title, url")
-                .eq("id", course_id)
-                .limit(1)
-                .execute()
-            )
-            course = course_info.data[0] if course_info.data else {}
-
-            progress = CourseProgressService.get_course_progress(
-                user_id, course_id, token
-            )
+            course = courses_by_id.get(course_id, {})
+            mod_ids = modules_by_course.get(course_id, [])
+            total = len(mod_ids)
+            completed = sum(1 for mid in mod_ids if mid in passed_module_ids)
+            percentage = round(completed / total * 100, 2) if total > 0 else 0.0
 
             initial_level = user_skill_levels.get(slug, 0)
             initial_percentage = min(max(initial_level * 20, 0), 100)
-
             remaining_percentage = 100 - initial_percentage
-
-            module_weight = (
-                remaining_percentage / progress["total"]
-                if progress["total"] > 0
-                else 0
-            )
-
+            module_weight = (remaining_percentage / total) if total > 0 else 0
             skill_percentage = round(
-                initial_percentage + progress["completed"] * module_weight,
-                2,
+                initial_percentage + completed * module_weight, 2
             )
-
-            progress["skill_percentage"] = skill_percentage
 
             summary.append({
                 "skill_slug": slug,
                 "course_id": course_id,
                 "course_title": course.get("title"),
                 "course_url": course.get("url"),
-                "progress": progress,
+                "progress": {
+                    "completed": completed,
+                    "total": total,
+                    "percentage": percentage,
+                    "skill_percentage": skill_percentage,
+                },
             })
 
         return summary
