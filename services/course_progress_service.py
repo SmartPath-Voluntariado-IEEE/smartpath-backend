@@ -11,12 +11,12 @@ class CourseProgressService:
         invalidate("user:progress_summary")
         admin = get_admin_client()
 
+        # 1. Registrar o actualizar en user_skill_courses
         existing = (
             admin.table("user_skill_courses")
-            .select("id")
+            .select("id, course_id")
             .eq("user_id", user_id)
             .eq("skill_slug", skill_slug)
-            .eq("course_id", course_id)
             .limit(1)
             .execute()
         )
@@ -27,10 +27,45 @@ class CourseProgressService:
             "course_id": course_id,
         }
 
-        if not existing.data:
+        if existing.data:
+            admin.table("user_skill_courses").update({
+                "course_id": course_id,
+            }).eq("user_id", user_id).eq("skill_slug", skill_slug).execute()
+        else:
             admin.table("user_skill_courses").insert(row).execute()
 
-        return row
+        # 2. Asegurar que el curso quede activo en user_module_completion para que persista
+        try:
+            first_mod = (
+                admin.table("course_modules")
+                .select("id")
+                .eq("course_id", course_id)
+                .order("module_order")
+                .limit(1)
+                .execute()
+            )
+            if first_mod.data:
+                mid = first_mod.data[0]["id"]
+                comp_check = (
+                    admin.table("user_module_completion")
+                    .select("module_id")
+                    .eq("user_id", user_id)
+                    .eq("module_id", mid)
+                    .limit(1)
+                    .execute()
+                )
+                if not comp_check.data:
+                    admin.table("user_module_completion").insert({
+                        "user_id": user_id,
+                        "module_id": mid,
+                        "score": 0,
+                        "passed": False,
+                        "attempts": 0,
+                    }).execute()
+        except Exception as e:
+            print(f"⚠️ [SELECT COURSE] Error registrando módulo inicial: {e}")
+
+        return {"user_id": user_id, "skill_slug": skill_slug, "course_id": course_id}
 
     @staticmethod
     def unlink_course_from_skill(
@@ -39,16 +74,26 @@ class CourseProgressService:
         invalidate("user:progress_summary")
         admin = get_admin_client()
 
-        query = (
-            admin.table("user_skill_courses")
-            .delete()
-            .eq("user_id", user_id)
-            .eq("skill_slug", skill_slug)
-        )
         if course_id:
-            query = query.eq("course_id", course_id)
+            # Si el curso en user_skill_courses es el que se desvincula, eliminar la asignacion
+            current = (
+                admin.table("user_skill_courses")
+                .select("course_id")
+                .eq("user_id", user_id)
+                .eq("skill_slug", skill_slug)
+                .limit(1)
+                .execute()
+            )
+            if current.data and current.data[0]["course_id"] == course_id:
+                admin.table("user_skill_courses").delete().eq("user_id", user_id).eq("skill_slug", skill_slug).execute()
 
-        query.execute()
+            # Eliminar intentos no aprobados de este curso
+            c_mods = admin.table("course_modules").select("id").eq("course_id", course_id).execute()
+            mids = [m["id"] for m in (c_mods.data or [])]
+            if mids:
+                admin.table("user_module_completion").delete().eq("user_id", user_id).eq("passed", False).in_("module_id", mids).execute()
+        else:
+            admin.table("user_skill_courses").delete().eq("user_id", user_id).eq("skill_slug", skill_slug).execute()
 
     @staticmethod
     def _reset_progress_for_skill(user_id: str, skill_slug: str, token: str):
@@ -169,23 +214,60 @@ class CourseProgressService:
             s_slug = row.get("skill_slug")
             c_id = row.get("course_id")
             if s_slug and c_id:
-                user_courses_by_slug.setdefault(s_slug, []).append(c_id)
+                base_slug = s_slug.split("__c__")[0]
+                if c_id not in user_courses_by_slug.setdefault(base_slug, []):
+                    user_courses_by_slug[base_slug].append(c_id)
                 all_course_ids.add(c_id)
+
+        # 3. Traer todos los módulos completados o intentados por el usuario
+        user_completion_resp = (
+            admin.table("user_module_completion")
+            .select("module_id, passed")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        user_attempted_mids = [r["module_id"] for r in (user_completion_resp.data or [])]
+        passed_module_ids = {
+            r["module_id"] for r in (user_completion_resp.data or []) if r.get("passed")
+        }
+
+        # Si el usuario tiene actividad en módulos, averiguar qué cursos son
+        if user_attempted_mids:
+            attempted_mods = (
+                admin.table("course_modules")
+                .select("id, course_id")
+                .in_("id", user_attempted_mids)
+                .execute()
+            )
+            for m in (attempted_mods.data or []):
+                cid = m.get("course_id")
+                if cid:
+                    all_course_ids.add(cid)
 
         course_ids = list(all_course_ids)
         courses_by_id = {}
         modules_by_course: dict[int, list[str]] = {cid: [] for cid in course_ids}
         all_module_ids = []
 
-        # 3. Traer cursos y módulos en bloque (máx 2 viajes)
+        # 4. Traer cursos con sus habilidades y módulos en bloque (máx 2 viajes)
         if course_ids:
             courses_resp = (
                 admin.table("courses")
-                .select("id, title, url, platform, duration_hours, level, is_free")
+                .select("id, title, url, platform, duration_hours, level, is_free, course_skills(skills(slug))")
                 .in_("id", course_ids)
                 .execute()
             )
             courses_by_id = {c["id"]: c for c in (courses_resp.data or [])}
+
+            # Vincular cursos con actividad a sus skills correspondientes
+            for c in (courses_resp.data or []):
+                cid = c["id"]
+                for cs in (c.get("course_skills") or []):
+                    skill_obj = cs.get("skills")
+                    if skill_obj and skill_obj.get("slug"):
+                        s_slug = skill_obj["slug"]
+                        if cid not in user_courses_by_slug.setdefault(s_slug, []):
+                            user_courses_by_slug[s_slug].append(cid)
 
             modules_resp = (
                 admin.table("course_modules")
@@ -196,21 +278,6 @@ class CourseProgressService:
             for m in (modules_resp.data or []):
                 modules_by_course.setdefault(m["course_id"], []).append(m["id"])
                 all_module_ids.append(m["id"])
-
-        # 4. Traer módulos completados por el usuario en bloque (1 viaje)
-        passed_module_ids = set()
-        if all_module_ids:
-            completed_resp = (
-                admin.table("user_module_completion")
-                .select("module_id")
-                .eq("user_id", user_id)
-                .eq("passed", True)
-                .in_("module_id", all_module_ids)
-                .execute()
-            )
-            passed_module_ids = {
-                r["module_id"] for r in (completed_resp.data or [])
-            }
 
         summary = []
         for skill in roadmap_skills:
