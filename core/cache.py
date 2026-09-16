@@ -26,8 +26,16 @@ _lock = threading.Lock()
 DEFAULT_TTL_SECONDS = 300
 
 
+def _freeze(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return tuple(sorted((k, _freeze(v)) for k, v in obj.items()))
+    if isinstance(obj, (list, tuple, set)):
+        return tuple(_freeze(x) for x in obj)
+    return obj
+
+
 def _make_key(args: tuple, kwargs: dict) -> tuple:
-    return (args, tuple(sorted(kwargs.items())))
+    return (_freeze(args), _freeze(kwargs))
 
 
 def ttl_cache(

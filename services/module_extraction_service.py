@@ -83,7 +83,7 @@ class ModuleExtractionService:
         consultando user_module_completion.
         """
         try:
-            supabase = get_db_client(token) if token else get_admin_client()
+            supabase = get_admin_client()
             module_ids = [m["id"] for m in modules]
 
             completion_result = (

@@ -938,6 +938,7 @@ def select_course_for_skill(
 )
 def unlink_course_from_skill(
     skill_slug: str,
+    course_id: int | None = Query(None),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user=Depends(get_current_user),
 ):
@@ -945,6 +946,7 @@ def unlink_course_from_skill(
         user_id=current_user.id,
         skill_slug=skill_slug,
         token=credentials.credentials,
+        course_id=course_id,
     )
     return {"status": "unlinked"}
 
