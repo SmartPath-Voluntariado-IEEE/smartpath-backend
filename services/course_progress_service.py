@@ -16,6 +16,7 @@ class CourseProgressService:
             .select("id")
             .eq("user_id", user_id)
             .eq("skill_slug", skill_slug)
+            .eq("course_id", course_id)
             .limit(1)
             .execute()
         )
@@ -26,28 +27,28 @@ class CourseProgressService:
             "course_id": course_id,
         }
 
-        if existing.data:
-            
-            CourseProgressService._reset_progress_for_skill(
-                user_id, skill_slug, token
-            )
-            admin.table("user_skill_courses").update(row).eq(
-                "user_id", user_id
-            ).eq("skill_slug", skill_slug).execute()
-        else:
+        if not existing.data:
             admin.table("user_skill_courses").insert(row).execute()
 
         return row
 
     @staticmethod
-    def unlink_course_from_skill(user_id: str, skill_slug: str, token: str):
+    def unlink_course_from_skill(
+        user_id: str, skill_slug: str, token: str, course_id: int | None = None
+    ):
         invalidate("user:progress_summary")
-        CourseProgressService._reset_progress_for_skill(user_id, skill_slug, token)
-
         admin = get_admin_client()
-        admin.table("user_skill_courses").delete().eq(
-            "user_id", user_id
-        ).eq("skill_slug", skill_slug).execute()
+
+        query = (
+            admin.table("user_skill_courses")
+            .delete()
+            .eq("user_id", user_id)
+            .eq("skill_slug", skill_slug)
+        )
+        if course_id:
+            query = query.eq("course_id", course_id)
+
+        query.execute()
 
     @staticmethod
     def _reset_progress_for_skill(user_id: str, skill_slug: str, token: str):
@@ -162,13 +163,16 @@ class CourseProgressService:
             .eq("user_id", user_id)
             .execute()
         )
-        user_courses_by_slug = {
-            row["skill_slug"]: row["course_id"]
-            for row in (user_courses_resp.data or [])
-            if row.get("skill_slug")
-        }
+        user_courses_by_slug: dict[str, list[int]] = {}
+        all_course_ids = set()
+        for row in (user_courses_resp.data or []):
+            s_slug = row.get("skill_slug")
+            c_id = row.get("course_id")
+            if s_slug and c_id:
+                user_courses_by_slug.setdefault(s_slug, []).append(c_id)
+                all_course_ids.add(c_id)
 
-        course_ids = list({cid for cid in user_courses_by_slug.values() if cid})
+        course_ids = list(all_course_ids)
         courses_by_id = {}
         modules_by_course: dict[int, list[str]] = {cid: [] for cid in course_ids}
         all_module_ids = []
@@ -177,7 +181,7 @@ class CourseProgressService:
         if course_ids:
             courses_resp = (
                 admin.table("courses")
-                .select("id, title, url")
+                .select("id, title, url, platform, duration_hours, level, is_free")
                 .in_("id", course_ids)
                 .execute()
             )
@@ -211,43 +215,71 @@ class CourseProgressService:
         summary = []
         for skill in roadmap_skills:
             slug = skill["skill_slug"]
-            course_id = user_courses_by_slug.get(slug)
+            cids = user_courses_by_slug.get(slug, [])
 
-            if not course_id:
+            if not cids:
                 summary.append({
                     "skill_slug": slug,
                     "course_id": None,
                     "course_title": None,
                     "course_url": None,
                     "progress": None,
+                    "assigned_courses": [],
                 })
                 continue
 
-            course = courses_by_id.get(course_id, {})
-            mod_ids = modules_by_course.get(course_id, [])
-            total = len(mod_ids)
-            completed = sum(1 for mid in mod_ids if mid in passed_module_ids)
-            percentage = round(completed / total * 100, 2) if total > 0 else 0.0
+            assigned_courses = []
+            for cid in cids:
+                course = courses_by_id.get(cid, {})
+                mod_ids = modules_by_course.get(cid, [])
+                total = len(mod_ids)
+                completed = sum(1 for mid in mod_ids if mid in passed_module_ids)
+                percentage = round(completed / total * 100, 2) if total > 0 else 0.0
 
-            initial_level = user_skill_levels.get(slug, 0)
-            initial_percentage = min(max(initial_level * 20, 0), 100)
-            remaining_percentage = 100 - initial_percentage
-            module_weight = (remaining_percentage / total) if total > 0 else 0
-            skill_percentage = round(
-                initial_percentage + completed * module_weight, 2
-            )
+                initial_level = user_skill_levels.get(slug, 0)
+                initial_percentage = min(max(initial_level * 20, 0), 100)
+                remaining_percentage = 100 - initial_percentage
+                module_weight = (remaining_percentage / total) if total > 0 else 0
+                skill_percentage = round(
+                    initial_percentage + completed * module_weight, 2
+                )
+
+                assigned_courses.append({
+                    "course_id": cid,
+                    "course_title": course.get("title") or f"Curso #{cid}",
+                    "course_url": course.get("url"),
+                    "platform": course.get("platform") or "Online",
+                    "duration_hours": course.get("duration_hours"),
+                    "level": course.get("level"),
+                    "is_free": course.get("is_free", True),
+                    "completed_modules": completed,
+                    "total_modules": total,
+                    "percentage": percentage,
+                    "skill_percentage": skill_percentage,
+                    "is_completed": total > 0 and completed >= total,
+                })
+
+            # Seleccionar curso principal para retrocompatibilidad
+            main_course = next((c for c in assigned_courses if 0 < c["percentage"] < 100), None)
+            if not main_course:
+                main_course = next((c for c in assigned_courses if c["is_completed"]), assigned_courses[0])
 
             summary.append({
                 "skill_slug": slug,
-                "course_id": course_id,
-                "course_title": course.get("title"),
-                "course_url": course.get("url"),
+                "course_id": main_course["course_id"],
+                "course_title": main_course["course_title"],
+                "course_url": main_course["course_url"],
+                "completed_modules": main_course["completed_modules"],
+                "total_modules": main_course["total_modules"],
+                "course_percentage": main_course["percentage"],
+                "skill_percentage": main_course["skill_percentage"],
                 "progress": {
-                    "completed": completed,
-                    "total": total,
-                    "percentage": percentage,
-                    "skill_percentage": skill_percentage,
+                    "completed": main_course["completed_modules"],
+                    "total": main_course["total_modules"],
+                    "percentage": main_course["percentage"],
+                    "skill_percentage": main_course["skill_percentage"],
                 },
+                "assigned_courses": assigned_courses,
             })
 
         return summary

@@ -391,6 +391,7 @@ class CatalogService:
         "catalog:jobs",
         "catalog:market",
         "catalog:courses",
+        "catalog:course_detail",
         "catalog:role_skills",
         "catalog:roles",
     )
@@ -404,7 +405,9 @@ class CatalogService:
         """
 
         invalidate(*CatalogService.CACHE_NAMESPACES)
+
     @staticmethod
+    @ttl_cache("catalog:course_detail", CATALOG_TTL_SECONDS)
     def get_course_by_id(course_id: int) -> dict | None:
         client = get_admin_client()
         response = (
